@@ -5,6 +5,7 @@ from browser_agent.browser.actions import (
     WaitForSelector,
     WaitForUser,
     ExtractLinks,
+    ExtractHTML,
 )
 
 
@@ -33,3 +34,13 @@ def test_wait_for_user_action():
 def test_extract_links_action():
     el = ExtractLinks(pattern='a[href*="/posts/"]')
     assert el.pattern == 'a[href*="/posts/"]'
+
+
+def test_extract_html_action():
+    """Test ExtractHTML action initialization."""
+    eh = ExtractHTML(selector='div[class*="content"]')
+    assert eh.selector == 'div[class*="content"]'
+    
+    # Test with different selectors
+    eh2 = ExtractHTML(selector='#main-content')
+    assert eh2.selector == '#main-content'

@@ -63,7 +63,7 @@ chmod +x extract_all.sh
 ./extract_all.sh
 ```
 
-**Output:** `outputs/<collection_name>/<post_id>-desc.html`
+**Output:** `outputs/POST_<post_id>_<post_name>/<post_id>-desc.html`
 
 ### 4. Stop Server (Terminal 1)
 
@@ -73,12 +73,12 @@ Press `Ctrl+C` when done
 
 ```
 outputs/
-└── <collection_name>/           # e.g., "SDXL Models"
-    ├── 144726506-desc.html      # Description HTML
-    ├── 144726506-meta.json      # Metadata
+├── POST_144726506_Anya Taylor-Joy [ SDXL ]/
+│   ├── 144726506-desc.html      # Description HTML
+│   └── 144726506-meta.json      # Metadata
+└── POST_144669916_Ana De Armas [Pony SDXL]/
     ├── 144669916-desc.html
-    ├── 144669916-meta.json
-    └── ...
+    └── 144669916-meta.json
 ```
 
 ## Quick Commands Reference
@@ -156,16 +156,16 @@ Step 3: Getting collection name...
   Collection: SDXL Models
 Step 4: Extracting post content...
 → Navigating to post...
-  Title: Anya Taylor-Joy SDXL LoRA | Patreon
+  Title: Anya Taylor-Joy [ SDXL ] | Patreon
 → Waiting for content...
 ✓ Found content using selector: div[class*="cm-LIiDtl"]
   Length: 2543 characters
 Step 5: Saving content...
-✓ Saved HTML to outputs/SDXL_Models/144726506-desc.html
-✓ Saved metadata to outputs/SDXL_Models/144726506-meta.json
+✓ Saved HTML to outputs/POST_144726506_Anya Taylor-Joy [ SDXL ]/144726506-desc.html
+✓ Saved metadata to outputs/POST_144726506_Anya Taylor-Joy [ SDXL ]/144726506-meta.json
 
 ✓ Extraction complete!
-Output: outputs/SDXL_Models/144726506-desc.html
+Output: outputs/POST_144726506_Anya Taylor-Joy [ SDXL ]/144726506-desc.html
 ```
 
 ## Next Steps

@@ -144,20 +144,12 @@ def main():
         # Wait for user to authenticate
         input("\n[yellow]Please log in to Patreon in the browser, then press Enter to continue...[/yellow]\n")
         
-        # Step 2: Get collection name
-        print(f"\n[bold]Step 2:[/bold] Getting collection name...")
-        collection_url = f"https://www.patreon.com/collection/{collection_id}?view=expanded"
-        controller.perform(Navigate(collection_url))
-        time.sleep(2)  # Wait for page to load
-        collection_name = extract_collection_name(controller, collection_id)
-        print(f"Collection name: [cyan]{collection_name}[/cyan]")
-        
-        # Step 3: Navigate to post
-        print(f"\n[bold]Step 3:[/bold] Navigating to post...")
+        # Step 2: Navigate to post
+        print(f"\n[bold]Step 2:[/bold] Navigating to post...")
         controller.perform(Navigate(post_url))
         
-        # Step 4: Wait for content to load
-        print("\n[bold]Step 4:[/bold] Waiting for content to load...")
+        # Step 3: Wait for content to load
+        print("\n[bold]Step 3:[/bold] Waiting for content to load...")
         try:
             # Wait for the description content div
             controller.perform(WaitForSelector('div[class*="cm-"]', timeout_ms=10000))
@@ -165,8 +157,8 @@ def main():
         except Exception as e:
             print(f"[yellow]Warning: Timeout waiting for content. Proceeding anyway...[/yellow]")
         
-        # Step 5: Extract description HTML
-        print("\n[bold]Step 5:[/bold] Extracting description HTML...")
+        # Step 4: Extract description HTML
+        print("\n[bold]Step 4:[/bold] Extracting description HTML...")
         
         # The description is typically in a div with classes like "cm-LIiDtl cm-wHoaYV cm-mhTrbr cm-LsBaRW"
         # Try multiple selectors to find the description
@@ -199,15 +191,20 @@ def main():
         
         print(f"[green]✓ Extracted {len(html_content)} characters of HTML[/green]")
         
-        # Step 6: Save to file
-        print("\n[bold]Step 6:[/bold] Saving to file...")
-        
-        # Create output directory structure
-        output_dir = Path("outputs") / collection_name
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Get post title and extract post name
+        post_title = extract_post_title(controller)
+        post_name = post_title.split("|")[0].strip() if "|" in post_title else post_title
         
         # Extract post ID from URL
         post_id = post_url.split("/posts/")[1].split("?")[0] if "/posts/" in post_url else "unknown"
+        
+        # Step 5: Save to file
+        print("\n[bold]Step 5:[/bold] Saving to file...")
+        
+        # Create folder name: POST_<POST_ID>_<POST_NAME>
+        folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
+        output_dir = Path("outputs") / folder_name
+        output_dir.mkdir(parents=True, exist_ok=True)
         
         # Save HTML file
         output_file = output_dir / f"{post_id}-desc.html"
@@ -221,8 +218,8 @@ def main():
             "post_id": post_id,
             "post_url": post_url,
             "collection_id": collection_id,
-            "collection_name": collection_name,
-            "title": extract_post_title(controller),
+            "post_name": post_name,
+            "title": post_title,
             "html_length": len(html_content)
         }
         

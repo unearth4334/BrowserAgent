@@ -142,13 +142,16 @@ python scripts/extract_patreon_content.py 1611241 /usr/bin/brave-browser https:/
 
 ### Output Structure
 
-Content is saved to `outputs/<collection_name>/`:
+Content is saved to `outputs/POST_<post_id>_<post_name>/`:
 
 ```
 outputs/
-└── <collection_name>/
-    ├── <post_id>-desc.html    # Description HTML
-    └── <post_id>-meta.json    # Metadata
+├── POST_144726506_Anya Taylor-Joy [ SDXL ]/
+│   ├── 144726506-desc.html    # Description HTML
+│   └── 144726506-meta.json    # Metadata
+└── POST_144669916_Ana De Armas [Pony SDXL]/
+    ├── 144669916-desc.html
+    └── 144669916-meta.json
 ```
 
 **HTML file (`<post_id>-desc.html`):**
@@ -165,9 +168,9 @@ Contains the raw HTML of the post description, including:
   "post_id": "144726506",
   "post_url": "https://www.patreon.com/posts/144726506?collection=1611241",
   "collection_id": "1611241",
-  "collection_name": "SDXL Models Collection",
-  "title": "Anya Taylor-Joy SDXL LoRA",
-  "html_length": 2543
+  "post_name": "Anya Taylor-Joy [ SDXL ]",
+  "title": "Anya Taylor-Joy [ SDXL ] | Patreon",
+  "html_length": 3400
 }
 ```
 

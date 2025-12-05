@@ -127,10 +127,11 @@ def extract_post_content(client: BrowserClient, post_url: str, collection_name: 
     }
 
 
-def save_post_content(collection_name: str, post_id: str, post_url: str, collection_id: str, content: dict):
+def save_post_content(post_id: str, post_name: str, post_url: str, collection_id: str, content: dict):
     """Save post content to files."""
-    # Create output directory
-    output_dir = Path("outputs") / collection_name
+    # Create folder name: POST_<POST_ID>_<POST_NAME>
+    folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
+    output_dir = Path("outputs") / folder_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save HTML file
@@ -145,7 +146,7 @@ def save_post_content(collection_name: str, post_id: str, post_url: str, collect
         "post_id": post_id,
         "post_url": post_url,
         "collection_id": collection_id,
-        "collection_name": collection_name,
+        "post_name": post_name,
         "title": content["title"],
         "html_length": len(content["html"])
     }
@@ -226,25 +227,25 @@ def main():
     # Extract post ID from URL
     post_id = post_url.split("/posts/")[1].split("?")[0] if "/posts/" in post_url else "unknown"
     
-    # Get collection name
-    print("\n[bold]Step 3:[/bold] Getting collection name...")
-    collection_name = extract_collection_name(client, collection_id)
-    print(f"[cyan]  Collection: {collection_name}[/cyan]")
-    
-    # Extract post content
-    print(f"\n[bold]Step 4:[/bold] Extracting post content...")
-    content = extract_post_content(client, post_url, collection_name)
+    # Extract post content first to get the post name/title
+    print(f"\n[bold]Step 3:[/bold] Extracting post content...")
+    content = extract_post_content(client, post_url, "")
     
     if not content:
         print("[red]✗ Failed to extract content[/red]")
         return
     
+    # Extract post name from title (remove " | Patreon" suffix)
+    post_title = content.get("title", "Unknown")
+    post_name = post_title.split("|")[0].strip() if "|" in post_title else post_title
+    
     # Save content
-    print(f"\n[bold]Step 5:[/bold] Saving content...")
-    save_post_content(collection_name, post_id, post_url, collection_id, content)
+    print(f"\n[bold]Step 4:[/bold] Saving content...")
+    save_post_content(post_id, post_name, post_url, collection_id, content)
     
     print(f"\n[bold green]✓ Extraction complete![/bold green]")
-    print(f"[dim]Output: outputs/{collection_name}/{post_id}-desc.html[/dim]")
+    folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
+    print(f"[dim]Output: outputs/{folder_name}/{post_id}-desc.html[/dim]")
 
 
 if __name__ == "__main__":
