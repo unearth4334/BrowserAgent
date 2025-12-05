@@ -39,4 +39,10 @@ class ExtractLinks:
     pattern: str  # CSS selector or pattern to match
 
 
-Action = Union[Navigate, Click, Type, WaitForSelector, WaitForUser, ExtractLinks]
+@dataclass
+class ExtractHTML:
+    """Extract HTML content matching a selector from the current page."""
+    selector: str  # CSS selector to match elements
+
+
+Action = Union[Navigate, Click, Type, WaitForSelector, WaitForUser, ExtractLinks, ExtractHTML]

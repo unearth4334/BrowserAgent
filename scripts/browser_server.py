@@ -14,7 +14,7 @@ import threading
 from pathlib import Path
 
 from browser_agent.browser.playwright_driver import PlaywrightBrowserController
-from browser_agent.browser.actions import Navigate, Click, WaitForSelector, ExtractLinks
+from browser_agent.browser.actions import Navigate, Click, WaitForSelector, ExtractLinks, ExtractHTML
 from rich import print
 from rich.console import Console
 
@@ -144,6 +144,35 @@ class BrowserServer:
                     "count": len(links),
                     "links": links
                 }
+            
+            elif action == "extract_html":
+                selector = command.get("selector")
+                self.controller.perform(ExtractHTML(selector))
+                html = self.controller.get_extracted_html()
+                if not html:
+                    return {
+                        "status": "error",
+                        "message": f"No element found matching selector: {selector}",
+                        "html": "",
+                        "length": 0
+                    }
+                return {
+                    "status": "success",
+                    "html": html,
+                    "length": len(html)
+                }
+            
+            elif action == "eval_js":
+                # Execute JavaScript and return result
+                js_code = command.get("code")
+                if self.controller._page:
+                    result = self.controller._page.evaluate(js_code)
+                    return {
+                        "status": "success",
+                        "result": result
+                    }
+                else:
+                    return {"status": "error", "message": "No page available"}
             
             elif action == "info":
                 obs = self.controller.get_observation()

@@ -5,7 +5,7 @@ from typing import Optional, Protocol, runtime_checkable
 
 from playwright.sync_api import sync_playwright, Browser as PWBrowser, Page
 
-from .actions import Action, Navigate, Click, Type, WaitForSelector, WaitForUser, ExtractLinks
+from .actions import Action, Navigate, Click, Type, WaitForSelector, WaitForUser, ExtractLinks, ExtractHTML
 from .observation import PageObservation, ButtonInfo, InputInfo
 from ..logging_utils import get_logger
 
@@ -40,6 +40,7 @@ class PlaywrightBrowserController:
     _browser: Optional[PWBrowser] = field(default=None, init=False)
     _page: Optional[Page] = field(default=None, init=False)
     _extracted_links: list[str] = field(default_factory=list, init=False)
+    _extracted_html: str = field(default="", init=False)
 
     def start(self) -> None:
         if self._browser is not None:
@@ -132,9 +133,22 @@ class PlaywrightBrowserController:
                 if href:
                     self._extracted_links.append(href)
             logger.info("Extracted %d links matching pattern: %s", len(self._extracted_links), action.pattern)
+        elif isinstance(action, ExtractHTML):
+            # Extract HTML content matching the selector
+            element = page.query_selector(action.selector)
+            if element:
+                self._extracted_html = element.inner_html()
+                logger.info("Extracted HTML from selector: %s (%d chars)", action.selector, len(self._extracted_html))
+            else:
+                self._extracted_html = ""
+                logger.warning("No element found matching selector: %s", action.selector)
         else:  # pragma: no cover - safety
             raise ValueError(f"Unknown action type {action}")
     
     def get_extracted_links(self) -> list[str]:
         """Return the list of extracted links from the last ExtractLinks action."""
         return self._extracted_links.copy()
+    
+    def get_extracted_html(self) -> str:
+        """Return the extracted HTML from the last ExtractHTML action."""
+        return self._extracted_html

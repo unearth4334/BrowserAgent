@@ -67,6 +67,20 @@ class BrowserClient:
             "selector": selector
         })
     
+    def extract_html(self, selector: str) -> dict:
+        """Extract HTML content from a selector."""
+        return self.send_command({
+            "action": "extract_html",
+            "selector": selector
+        })
+    
+    def eval_js(self, code: str) -> dict:
+        """Execute JavaScript code and return the result."""
+        return self.send_command({
+            "action": "eval_js",
+            "code": code
+        })
+    
     def info(self) -> dict:
         """Get current page info."""
         return self.send_command({"action": "info"})
