@@ -49,8 +49,50 @@ def main():
         except Exception as e:
             print(f"[yellow]Warning: Timeout waiting for links. Proceeding anyway...[/yellow]")
         
-        # Step 4: Extract links
-        print(f"\n[bold]Step 4:[/bold] Extracting links...")
+        # Step 4: Click "Load more" button repeatedly until all content is loaded
+        print("\n[bold]Step 4:[/bold] Loading all collection items...")
+        from browser_agent.browser.actions import Click
+        import time
+        
+        load_more_count = 0
+        max_loads = 50  # Safety limit to prevent infinite loops
+        
+        while load_more_count < max_loads:
+            # Try to find and click the Load more button
+            # The button has specific classes and "Load more" text
+            load_more_selectors = [
+                'button:has-text("Load more")',
+                'button.cm-dupTbP:has-text("Load more")',
+                'button[aria-disabled="false"]:has-text("Load more")',
+            ]
+            
+            button_found = False
+            for selector in load_more_selectors:
+                try:
+                    # Use Playwright's page directly for a timeout-controlled click
+                    if controller._page:
+                        # Try to click with a short timeout (5 seconds)
+                        controller._page.click(selector, timeout=5000)
+                        load_more_count += 1
+                        button_found = True
+                        print(f"[dim]  Clicked 'Load more' button ({load_more_count} times)[/dim]")
+                        time.sleep(2)  # Wait for content to load
+                        break
+                except Exception as e:
+                    # Button not found or timed out - this is expected when no more content
+                    continue
+            
+            if not button_found:
+                # No more "Load more" buttons found
+                break
+        
+        if load_more_count > 0:
+            print(f"[green]✓ Loaded {load_more_count} additional pages[/green]")
+        else:
+            print("[dim]  No 'Load more' button found or all content already visible[/dim]")
+        
+        # Step 5: Extract links
+        print(f"\n[bold]Step 5:[/bold] Extracting links...")
         
         # Try specific pattern first
         selector = f'a[href*="/posts/"][href*="collection={collection_id}"]'
