@@ -1,6 +1,13 @@
 from unittest.mock import Mock, MagicMock, patch
 from browser_agent.browser.playwright_driver import PlaywrightBrowserController
-from browser_agent.browser.actions import Navigate, Click, Type, WaitForSelector
+from browser_agent.browser.actions import (
+    Navigate,
+    Click,
+    Type,
+    WaitForSelector,
+    WaitForUser,
+    ExtractLinks,
+)
 from browser_agent.browser.observation import PageObservation
 import pytest
 
@@ -259,3 +266,67 @@ def test_playwright_controller_get_observation_with_exception_in_button():
     # Should have button with empty text
     assert len(obs.buttons) == 1
     assert obs.buttons[0].text == ""
+
+
+def test_playwright_controller_perform_wait_for_user(monkeypatch):
+    """Test performing wait for user action."""
+    controller = PlaywrightBrowserController()
+    
+    mock_page = MagicMock()
+    controller._page = mock_page
+    
+    # Mock input() to simulate user pressing Enter
+    mock_input = Mock(return_value="")
+    monkeypatch.setattr('builtins.input', mock_input)
+    
+    action = WaitForUser(message="Press Enter...")
+    controller.perform(action)
+    
+    mock_input.assert_called_once_with("Press Enter...")
+
+
+def test_playwright_controller_perform_extract_links():
+    """Test performing extract links action."""
+    controller = PlaywrightBrowserController()
+    
+    mock_page = MagicMock()
+    mock_element1 = MagicMock()
+    mock_element1.get_attribute.return_value = "https://example.com/post/1"
+    mock_element2 = MagicMock()
+    mock_element2.get_attribute.return_value = "https://example.com/post/2"
+    mock_element3 = MagicMock()
+    mock_element3.get_attribute.return_value = None  # No href
+    
+    mock_page.query_selector_all.return_value = [mock_element1, mock_element2, mock_element3]
+    controller._page = mock_page
+    
+    action = ExtractLinks(pattern='a[href*="/post/"]')
+    controller.perform(action)
+    
+    mock_page.query_selector_all.assert_called_once_with('a[href*="/post/"]')
+    
+    links = controller.get_extracted_links()
+    assert len(links) == 2
+    assert "https://example.com/post/1" in links
+    assert "https://example.com/post/2" in links
+
+
+def test_playwright_controller_get_extracted_links_empty():
+    """Test getting extracted links when none extracted."""
+    controller = PlaywrightBrowserController()
+    
+    links = controller.get_extracted_links()
+    assert links == []
+
+
+def test_playwright_controller_get_extracted_links_returns_copy():
+    """Test that get_extracted_links returns a copy."""
+    controller = PlaywrightBrowserController()
+    controller._extracted_links = ["link1", "link2"]
+    
+    links1 = controller.get_extracted_links()
+    links2 = controller.get_extracted_links()
+    
+    # Should be equal but not the same object
+    assert links1 == links2
+    assert links1 is not links2
