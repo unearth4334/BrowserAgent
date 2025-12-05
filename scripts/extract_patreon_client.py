@@ -99,8 +99,10 @@ def main():
                 print(f"  ... and {len(links) - 20} more")
             
             # Save to file
+            output_dir = Path("outputs")
+            output_dir.mkdir(exist_ok=True)
             output_file = f"patreon_collection_{collection_id}.json"
-            output_path = Path(output_file)
+            output_path = output_dir / output_file
             
             info_result = client.info()
             data = {
