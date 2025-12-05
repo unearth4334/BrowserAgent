@@ -19,6 +19,8 @@ playwright install chromium
 
 ## Usage
 
+### Simple Search Task
+
 Run a simple search task:
 
 ```bash
@@ -36,6 +38,46 @@ Run in non-headless mode:
 ```bash
 browser-agent simple-search "hello world" --no-headless
 ```
+
+### Interactive Mode (NEW!)
+
+Start a persistent browser session with a REPL for debugging and manual interaction:
+
+```bash
+# Start at a specific URL
+browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-browser
+
+# Or start without a URL
+browser-agent interactive --browser-exe /usr/bin/brave-browser
+```
+
+**Benefits:**
+- 🔐 Authenticate once, maintain session throughout
+- 🐛 Debug selectors and test commands interactively
+- 🔗 Extract links and save to JSON
+- 🚀 Execute JavaScript on the page
+- 📊 Inspect page elements (buttons, inputs, HTML)
+
+**Available commands:** `goto`, `extract`, `click`, `type`, `wait`, `info`, `links`, `save`, `html`, `eval`, `buttons`, `inputs`, `help`, `quit`
+
+See [INTERACTIVE_GUIDE.md](INTERACTIVE_GUIDE.md) for full documentation.
+
+### Patreon Collection Extraction
+
+Extract links from a Patreon collection (automated):
+
+```bash
+browser-agent patreon-collection 1611241 --browser-exe /usr/bin/brave-browser
+```
+
+Or use interactive mode (recommended - maintains authentication):
+
+```bash
+browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-browser
+# Then use: goto, wait, extract, save commands
+```
+
+See [PATREON_QUICK_START.md](PATREON_QUICK_START.md) for detailed Patreon workflow.
 
 ## Testing
 

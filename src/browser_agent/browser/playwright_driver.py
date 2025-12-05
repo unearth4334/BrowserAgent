@@ -5,7 +5,7 @@ from typing import Optional, Protocol, runtime_checkable
 
 from playwright.sync_api import sync_playwright, Browser as PWBrowser, Page
 
-from .actions import Action, Navigate, Click, Type, WaitForSelector
+from .actions import Action, Navigate, Click, Type, WaitForSelector, WaitForUser, ExtractLinks
 from .observation import PageObservation, ButtonInfo, InputInfo
 from ..logging_utils import get_logger
 
@@ -39,6 +39,7 @@ class PlaywrightBrowserController:
     _playwright: Optional[object] = field(default=None, init=False)
     _browser: Optional[PWBrowser] = field(default=None, init=False)
     _page: Optional[Page] = field(default=None, init=False)
+    _extracted_links: list[str] = field(default_factory=list, init=False)
 
     def start(self) -> None:
         if self._browser is not None:
@@ -109,7 +110,6 @@ class PlaywrightBrowserController:
         page = self._page
 
         logger.info("Performing action: %s", action)
-
         if isinstance(action, Navigate):
             page.goto(action.url, wait_until="load")
         elif isinstance(action, Click):
@@ -120,5 +120,21 @@ class PlaywrightBrowserController:
                 page.press(action.selector, "Enter")
         elif isinstance(action, WaitForSelector):
             page.wait_for_selector(action.selector, timeout=action.timeout_ms)
+        elif isinstance(action, WaitForUser):
+            logger.info("Waiting for user: %s", action.message)
+            input(action.message)
+        elif isinstance(action, ExtractLinks):
+            # Extract links matching the pattern
+            elements = page.query_selector_all(action.pattern)
+            self._extracted_links = []
+            for el in elements:
+                href = el.get_attribute("href")
+                if href:
+                    self._extracted_links.append(href)
+            logger.info("Extracted %d links matching pattern: %s", len(self._extracted_links), action.pattern)
         else:  # pragma: no cover - safety
             raise ValueError(f"Unknown action type {action}")
+    
+    def get_extracted_links(self) -> list[str]:
+        """Return the list of extracted links from the last ExtractLinks action."""
+        return self._extracted_links.copy()
