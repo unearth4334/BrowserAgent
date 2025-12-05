@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "browser-agent"
+version = "0.1.0"
+description = "Prototype AI-style agent controlling a Chromium/Brave browser via Playwright"
+requires-python = ">=3.11"
+dependencies = [
+  "playwright>=1.47.0",
+  "typer>=0.12.0",
+  "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.5.0",
+  "mypy>=1.10.0",
+]
+
+[project.scripts]
+browser-agent = "browser_agent.cli:main"
