@@ -49,9 +49,21 @@ class BrowserClient:
             # Send command
             client_socket.sendall(json.dumps(command).encode())
             
-            # Receive response
-            data = client_socket.recv(8192)
-            response = json.loads(data.decode())
+            # Receive response (handle larger responses in chunks)
+            chunks = []
+            while True:
+                chunk = client_socket.recv(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                # Try to parse - if successful, we have the full response
+                try:
+                    full_data = b''.join(chunks)
+                    response = json.loads(full_data.decode())
+                    break
+                except json.JSONDecodeError:
+                    # Need more data
+                    continue
             
             client_socket.close()
             return response

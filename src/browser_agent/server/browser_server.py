@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import socket
-from typing import Optional
+import traceback
 
 from ..browser.playwright_driver import PlaywrightBrowserController
 from ..browser.actions import Navigate, WaitForSelector, ExtractLinks, ExtractHTML
@@ -108,8 +108,8 @@ class BrowserServer:
     def _handle_client(self, client_socket: socket.socket):
         """Handle a client connection."""
         try:
-            # Receive command
-            data = client_socket.recv(4096)
+            # Receive command (increased buffer for larger commands)
+            data = client_socket.recv(65536)
             if not data:
                 return
             
@@ -127,10 +127,9 @@ class BrowserServer:
             error_response = {"status": "error", "message": str(e)}
             try:
                 client_socket.sendall(json.dumps(error_response).encode())
-            except:
+            except OSError:
                 pass
             self.console.print(f"[red]Error: {e}[/red]")
-            import traceback
             traceback.print_exc()
         finally:
             client_socket.close()
@@ -211,10 +210,10 @@ class BrowserServer:
                     return {"status": "error", "message": "No page available"}
                 
                 try:
-                    # Use page.expect_download() with a JavaScript click
+                    # Use page.expect_download() with navigation
                     with self.controller._page.expect_download() as download_info:
-                        # Navigate to the download URL - Playwright will intercept it
-                        self.controller._page.evaluate(f"window.location.href = '{url}'")
+                        # Navigate to the download URL using goto (safer than JS eval)
+                        self.controller._page.goto(url)
                     
                     download = download_info.value
                     download.save_as(save_path)
