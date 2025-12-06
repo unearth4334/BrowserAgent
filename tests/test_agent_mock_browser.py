@@ -6,7 +6,7 @@ from typing import List
 from browser_agent.agent.core import Agent, TaskResult
 from browser_agent.agent.task_spec import BaseTaskSpec, TaskState
 from browser_agent.browser.actions import Action, Navigate
-from browser_agent.browser.observation import PageObservation, ButtonInfo, InputInfo
+from browser_agent.browser.observation import PageObservation
 
 
 @dataclass

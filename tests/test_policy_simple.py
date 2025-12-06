@@ -1,6 +1,6 @@
 from browser_agent.agent.policy_simple import SimpleRuleBasedPolicy
 from browser_agent.agent.task_spec import SimpleSearchTaskSpec, TaskState
-from browser_agent.browser.observation import PageObservation, InputInfo, ButtonInfo
+from browser_agent.browser.observation import PageObservation, InputInfo
 from browser_agent.browser.actions import Navigate, Type
 
 

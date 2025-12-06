@@ -1,6 +1,5 @@
 """Tests for ExtractHTML action and related functionality."""
-from unittest.mock import Mock, MagicMock, patch
-import pytest
+from unittest.mock import MagicMock, patch
 
 from browser_agent.browser.actions import ExtractHTML
 from browser_agent.browser.playwright_driver import PlaywrightBrowserController

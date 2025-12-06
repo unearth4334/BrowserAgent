@@ -1,6 +1,13 @@
 """Tests for PatreonCollectionPolicy."""
-from browser_agent.agent.policy_patreon import PatreonCollectionPolicy
-from browser_agent.agent.task_spec import PatreonCollectionTaskSpec, TaskState
+import sys
+from pathlib import Path
+
+# Add examples/patreon to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from policy_patreon import PatreonCollectionPolicy
+from task_spec_patreon import PatreonCollectionTaskSpec
+from browser_agent.agent.task_spec import TaskState
 from browser_agent.browser.observation import PageObservation
 from browser_agent.browser.actions import Navigate, WaitForUser, WaitForSelector, ExtractLinks
 

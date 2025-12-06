@@ -7,9 +7,7 @@ from browser_agent.browser.actions import (
     WaitForSelector,
     WaitForUser,
     ExtractLinks,
-    ExtractHTML,
 )
-from browser_agent.browser.observation import PageObservation
 import pytest
 
 

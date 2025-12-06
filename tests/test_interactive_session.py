@@ -1,4 +1,4 @@
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch, mock_open
 from browser_agent.interactive_session import InteractiveBrowserSession
 from browser_agent.browser.observation import PageObservation, ButtonInfo, InputInfo
 from browser_agent.browser.actions import Navigate, Click, Type, WaitForSelector, ExtractLinks

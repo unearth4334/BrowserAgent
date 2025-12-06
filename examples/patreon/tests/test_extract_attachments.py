@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import pytest
+
+# Add examples/patreon to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # Mock the browser_client module
@@ -67,7 +71,7 @@ def test_extract_attachments_success(mock_client, sample_attachments):
     # Import here to use mocked module
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import extract_attachments
     
@@ -89,7 +93,7 @@ def test_extract_attachments_empty(mock_client):
     """Test extraction when no attachments are found."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import extract_attachments
     
@@ -107,7 +111,7 @@ def test_extract_attachments_deduplication(mock_client):
     """Test that duplicate attachments are removed."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import extract_attachments
     
@@ -137,7 +141,7 @@ def test_extract_attachments_error(mock_client):
     """Test attachment extraction when JavaScript fails."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import extract_attachments
     
@@ -155,7 +159,7 @@ def test_download_attachments_success(mock_client, temp_output_dir, sample_attac
     """Test successful attachment downloading."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import download_attachments
     
@@ -188,7 +192,7 @@ def test_download_attachments_empty(mock_client, temp_output_dir):
     """Test downloading with no attachments."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import download_attachments
     
@@ -201,7 +205,7 @@ def test_download_attachments_skip_existing(mock_client, temp_output_dir, sample
     """Test that existing files are skipped."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import download_attachments
     
@@ -222,7 +226,7 @@ def test_download_attachments_partial_failure(mock_client, temp_output_dir, samp
     """Test downloading when some downloads fail."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import download_attachments
     
@@ -259,7 +263,7 @@ def test_sanitize_filename():
     """Test filename sanitization."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import sanitize_filename
     
@@ -281,7 +285,7 @@ def test_save_post_content_with_attachments(temp_output_dir, sample_attachments)
     """Test saving post content including attachments."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import save_post_content
     
@@ -333,7 +337,7 @@ def test_save_post_content_no_attachments(temp_output_dir):
     """Test saving post content with no attachments."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import save_post_content
     
@@ -378,7 +382,7 @@ def test_javascript_attachment_extraction():
     # This tests the structure of the JavaScript, not execution
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     import inspect
     from extract_patreon_content_client import extract_attachments
@@ -408,7 +412,7 @@ def test_download_creates_attachments_subfolder(mock_client, temp_output_dir, sa
     """Test that download creates attachments subfolder."""
     import sys
     from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     
     from extract_patreon_content_client import download_attachments
     

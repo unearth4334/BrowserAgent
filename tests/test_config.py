@@ -1,5 +1,4 @@
 from browser_agent.config import Settings
-import os
 
 
 def test_settings_default():

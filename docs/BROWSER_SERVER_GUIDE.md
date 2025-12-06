@@ -6,71 +6,55 @@ The browser server allows you to **authenticate once** and then run multiple ext
 
 ## Architecture
 
-- **Server** (`browser_server.py`): Keeps browser open, listens for commands on port 9999
-- **Client** (`browser_client.py`): Python library to send commands to the server
-- **Extraction Script** (`extract_patreon_client.py`): Uses the client to extract collections
+- **Server** (`browser_agent.server.BrowserServer`): Keeps browser open, listens for commands on port 9999
+- **Client** (`browser_agent.server.BrowserClient`): Python library to send commands to the server
+- **CLI**: `browser-agent server` command to start the server
 
 ## Quick Start
 
 ### 1. Start the Browser Server
 
-In **Terminal 1**, start the server and authenticate:
+In **Terminal 1**, start the server:
 
 ```bash
-cd /home/sdamk/dev/BrowserAgent
-source .venv/bin/activate
-python scripts/browser_server.py /usr/bin/brave-browser
+# Start with optional initial URL
+browser-agent server https://example.com --browser-exe /usr/bin/brave-browser
+
+# Or start without URL
+browser-agent server --browser-exe /usr/bin/brave-browser
 ```
 
 This will:
-1. Open Brave browser
-2. Navigate to Patreon
-3. Wait for you to log in
+1. Open the browser
+2. Navigate to the initial URL (if provided)
+3. Wait for you to authenticate if needed
 4. Start listening on port 9999
 
 **Leave this terminal running!** The browser stays open.
 
-### 2. Run Extraction Scripts
+### 2. Connect with Python Client
 
-In **Terminal 2** (or more), run extraction scripts:
+In **Terminal 2** (or more), use the BrowserClient:
 
-```bash
-cd /home/sdamk/dev/BrowserAgent
-source .venv/bin/activate
-python scripts/extract_patreon_client.py 1611241
-```
+```python
+from browser_agent.server import BrowserClient
 
-This will:
-1. Connect to the running browser
-2. Navigate to the collection
-3. Click "Load more" buttons
-4. Extract and save all links
+client = BrowserClient()
 
-**No re-authentication needed!** 🎉
+# Check server is running
+result = client.ping()
+print(result)  # {'status': 'success', 'message': 'pong'}
 
-### 3. Send Individual Commands
-
-You can also send commands directly:
-
-```bash
-# Check if server is alive
-python scripts/browser_client.py ping
-
-# Get current page info
-python scripts/browser_client.py info
-
-# Navigate somewhere
-python scripts/browser_client.py goto "https://www.patreon.com/collection/1611241"
-
-# Wait for content
-python scripts/browser_client.py wait 'a[href*="/posts/"]' 15000
-
-# Click a button
-python scripts/browser_client.py click 'button:has-text("Load more")' 5000
+# Navigate to a URL
+result = client.goto("https://example.com/page")
+print(result)  # {'status': 'success', 'url': '...', 'title': '...'}
 
 # Extract links
-python scripts/browser_client.py extract 'a[href*="/posts/"]'
+result = client.extract('a[href*="/items/"]')
+links = result.get('links', [])
 ```
+
+**No re-authentication needed!** 🎉
 
 ## Benefits
 
@@ -82,23 +66,40 @@ python scripts/browser_client.py extract 'a[href*="/posts/"]'
 
 ## Python API
 
-Use the client in your own scripts:
+### BrowserClient Methods
 
 ```python
-from browser_client import BrowserClient
+from browser_agent.server import BrowserClient
 
-client = BrowserClient()
+client = BrowserClient(host="localhost", port=9999)
 
-# Navigate
-result = client.goto("https://www.patreon.com/collection/1611241")
-print(result)  # {'status': 'success', 'url': '...', 'title': '...'}
+# Navigation
+client.goto(url)              # Navigate to URL
+client.info()                 # Get current page info
 
-# Click a button
-result = client.click('button:has-text("Load more")', timeout=5000)
+# Interaction
+client.click(selector, timeout=5000)       # Click an element
+client.wait(selector, timeout=10000)       # Wait for element
 
-# Extract links
-result = client.extract('a[href*="/posts/"]')
-links = result.get('links', [])
+# Extraction
+client.extract(selector)       # Extract links matching selector
+client.extract_html(selector)  # Extract HTML content
+client.eval_js(code)          # Execute JavaScript
+
+# File Operations
+client.download(url, save_path)  # Download a file
+
+# Server
+client.ping()                 # Check server is alive
+```
+
+### Starting Server Programmatically
+
+```python
+from browser_agent.server import BrowserServer
+
+server = BrowserServer(browser_exe="/usr/bin/brave-browser", port=9999)
+server.start(initial_url="https://example.com", wait_for_auth=True)
 ```
 
 ## Stopping the Server
@@ -117,30 +118,28 @@ In the server terminal, press `Ctrl+C` to stop the browser and server.
 
 **Want a different port:**
 ```bash
-python scripts/browser_server.py /usr/bin/brave-browser 8888
-python scripts/browser_client.py ping  # Add port parameter in code if needed
+browser-agent server --port 8888
 ```
 
 ## Example Workflow
 
 ```bash
 # Terminal 1: Start server (one time)
-python scripts/browser_server.py /usr/bin/brave-browser
-# Log in to Patreon...
+browser-agent server https://example.com --browser-exe /usr/bin/brave-browser
+# Authenticate if needed...
 # Press Enter
 # Server now running...
 
-# Terminal 2: Extract collection 1
-python scripts/extract_patreon_client.py 1611241
-
-# Terminal 2: Extract another collection (no re-auth!)
-python scripts/extract_patreon_client.py 2222222
-
-# Terminal 2: Test a selector
-python scripts/browser_client.py extract 'a.post-link'
-
-# Terminal 2: Navigate manually
-python scripts/browser_client.py goto "https://www.patreon.com/home"
+# Terminal 2: Use Python client
+python -c "
+from browser_agent.server import BrowserClient
+client = BrowserClient()
+print(client.info())
+"
 
 # Terminal 1: Ctrl+C to stop when done
 ```
+
+## For Site-Specific Examples
+
+See `examples/patreon/` for a complete example of using the browser server for Patreon content extraction.
