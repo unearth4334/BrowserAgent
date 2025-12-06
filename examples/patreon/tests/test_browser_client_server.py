@@ -1,6 +1,5 @@
 """Tests for browser server and client functionality."""
 import json
-import socket
 from unittest.mock import Mock, MagicMock, patch, call
 import pytest
 
