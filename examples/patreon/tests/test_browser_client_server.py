@@ -1,6 +1,5 @@
 """Tests for browser server and client functionality."""
 import json
-from unittest.mock import Mock, MagicMock, patch, call
 import pytest
 
 # Note: These are integration-style tests that test the server/client contract
