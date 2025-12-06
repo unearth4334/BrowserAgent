@@ -177,8 +177,8 @@ class TestContentExtraction:
         """Test that multiple selectors are attempted."""
         # Simulate trying multiple selectors
         selectors = [
-            ('div[class*="content"]', None),  # First fails
-            ('div[data-tag="content"]', None),  # Second fails
+            ('div[class*="post-content"]', None),  # First fails
+            ('div[data-tag="post-body"]', None),  # Second fails
             ('article', '<div>Content</div>')  # Third succeeds
         ]
         

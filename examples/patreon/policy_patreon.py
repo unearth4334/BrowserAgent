@@ -34,6 +34,8 @@ class PatreonCollectionPolicy:
         state: TaskState,
     ) -> Action:
         # Step 1: Navigate to Patreon home if not there yet
+        # Note: Using startswith for basic URL matching in this workflow example.
+        # For security-sensitive checks, use proper URL parsing (urllib.parse).
         if not task.authenticated and not obs.url.startswith("https://www.patreon.com"):
             return Navigate(task.initial_url())
 
