@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Extract Patreon post content using the persistent browser server.
-This script extracts the description HTML from individual posts in a collection.
+This script extracts the description HTML and attachments from individual posts in a collection.
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import json
 import sys
 import time
 from pathlib import Path
+import re
 
 from browser_client import BrowserClient
 from rich import print
@@ -127,7 +128,108 @@ def extract_post_content(client: BrowserClient, post_url: str, collection_name: 
     }
 
 
-def save_post_content(post_id: str, post_name: str, post_url: str, collection_id: str, content: dict):
+def extract_attachments(client: BrowserClient) -> list[dict]:
+    """Extract attachment information from the post."""
+    print(f"[cyan]→[/cyan] Extracting attachments...")
+    
+    # Use JavaScript to extract attachment links
+    js_code = """
+    (() => {
+        const attachments = [];
+        const attachmentLinks = document.querySelectorAll('a[data-tag="post-attachment-link"]');
+        
+        attachmentLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            const filenameElement = link.querySelector('p');
+            const filename = filenameElement ? filenameElement.textContent.trim() : 'unknown';
+            
+            if (href && href.includes('/file?')) {
+                attachments.push({
+                    url: href,
+                    filename: filename
+                });
+            }
+        });
+        
+        return attachments;
+    })()
+    """
+    
+    result = client.eval_js(js_code)
+    
+    if result.get("status") == "success":
+        attachments = result.get("result", [])
+        
+        # Deduplicate attachments by URL
+        seen_urls = set()
+        unique_attachments = []
+        for att in attachments:
+            if att['url'] not in seen_urls:
+                seen_urls.add(att['url'])
+                unique_attachments.append(att)
+        
+        if unique_attachments:
+            print(f"[green]✓ Found {len(unique_attachments)} attachment(s)[/green]")
+            for i, att in enumerate(unique_attachments, 1):
+                print(f"[dim]  {i}. {att['filename']}[/dim]")
+            return unique_attachments
+        else:
+            print(f"[dim]  No attachments found[/dim]")
+            return []
+    else:
+        print(f"[yellow]⚠ Failed to extract attachments: {result.get('message')}[/yellow]")
+        return []
+
+
+def download_attachments(client: BrowserClient, attachments: list[dict], output_dir: Path) -> dict[str, str]:
+    """Download attachment files to the attachments subfolder.
+    
+    Returns a dict mapping URLs to downloaded file paths.
+    """
+    if not attachments:
+        return {}
+    
+    # Create attachments subfolder
+    attachments_dir = output_dir / "attachments"
+    attachments_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"[cyan]→[/cyan] Downloading {len(attachments)} attachment(s) to {attachments_dir}...")
+    
+    downloaded = {}
+    for i, att in enumerate(attachments, 1):
+        filename = sanitize_filename(att['filename'])
+        file_path = attachments_dir / filename
+        
+        # Skip if already exists
+        if file_path.exists():
+            print(f"[dim]  {i}/{len(attachments)}: {filename} (already exists)[/dim]")
+            downloaded[att['url']] = str(file_path)
+            continue
+        
+        try:
+            print(f"[cyan]  {i}/{len(attachments)}: Downloading {filename}...[/cyan]")
+            
+            # Use browser client's download method (maintains authentication)
+            result = client.download(att['url'], str(file_path))
+            
+            if result.get("status") == "success":
+                if file_path.exists():
+                    size_mb = file_path.stat().st_size / (1024 * 1024)
+                    print(f"[green]  ✓ Downloaded {filename} ({size_mb:.2f} MB)[/green]")
+                    downloaded[att['url']] = str(file_path)
+                else:
+                    print(f"[yellow]  ⚠ Download reported success but file not found[/yellow]")
+            else:
+                print(f"[red]  ✗ Failed to download {filename}: {result.get('message')}[/red]")
+            
+        except Exception as e:
+            print(f"[red]  ✗ Failed to download {filename}: {e}[/red]")
+    
+    print(f"[green]✓ Downloaded {len(downloaded)}/{len(attachments)} attachment(s)[/green]")
+    return downloaded
+
+
+def save_post_content(post_id: str, post_name: str, post_url: str, collection_id: str, content: dict, attachments: list[dict]):
     """Save post content to files."""
     # Create folder name: POST_<POST_ID>_<POST_NAME>
     folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
@@ -148,7 +250,8 @@ def save_post_content(post_id: str, post_name: str, post_url: str, collection_id
         "collection_id": collection_id,
         "post_name": post_name,
         "title": content["title"],
-        "html_length": len(content["html"])
+        "html_length": len(content["html"]),
+        "attachments": attachments
     }
     
     metadata_file = output_dir / f"{post_id}-meta.json"
@@ -156,6 +259,13 @@ def save_post_content(post_id: str, post_name: str, post_url: str, collection_id
         json.dump(metadata, f, indent=2)
     
     print(f"[dim]✓ Saved metadata to {metadata_file}[/dim]")
+    
+    # Save attachments list separately for easy reference
+    if attachments:
+        attachments_file = output_dir / f"{post_id}-attachments.json"
+        with attachments_file.open('w', encoding='utf-8') as f:
+            json.dump(attachments, f, indent=2)
+        print(f"[dim]✓ Saved attachments list to {attachments_file}[/dim]")
 
 
 def main():
@@ -239,13 +349,28 @@ def main():
     post_title = content.get("title", "Unknown")
     post_name = post_title.split("|")[0].strip() if "|" in post_title else post_title
     
+    # Extract attachments
+    print(f"\n[bold]Step 4:[/bold] Extracting attachments...")
+    attachments = extract_attachments(client)
+    
     # Save content
-    print(f"\n[bold]Step 4:[/bold] Saving content...")
-    save_post_content(post_id, post_name, post_url, collection_id, content)
+    print(f"\n[bold]Step 5:[/bold] Saving content...")
+    save_post_content(post_id, post_name, post_url, collection_id, content, attachments)
+    
+    # Download attachments
+    if attachments:
+        print(f"\n[bold]Step 6:[/bold] Downloading attachments...")
+        folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
+        output_dir = Path("outputs") / folder_name
+        downloaded = download_attachments(client, attachments, output_dir)
+    else:
+        downloaded = {}
     
     print(f"\n[bold green]✓ Extraction complete![/bold green]")
     folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
     print(f"[dim]Output: outputs/{folder_name}/{post_id}-desc.html[/dim]")
+    if attachments:
+        print(f"[dim]Attachments: {len(downloaded)}/{len(attachments)} file(s) downloaded to attachments/[/dim]")
 
 
 if __name__ == "__main__":

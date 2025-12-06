@@ -174,6 +174,31 @@ class BrowserServer:
                 else:
                     return {"status": "error", "message": "No page available"}
             
+            elif action == "download":
+                # Download a file using Playwright's download mechanism
+                url = command.get("url")
+                save_path = command.get("save_path")
+                
+                if not self.controller._page:
+                    return {"status": "error", "message": "No page available"}
+                
+                try:
+                    # Use page.expect_download() with a JavaScript click
+                    with self.controller._page.expect_download() as download_info:
+                        # Navigate to the download URL - Playwright will intercept it
+                        self.controller._page.evaluate(f"window.location.href = '{url}'")
+                    
+                    download = download_info.value
+                    download.save_as(save_path)
+                    
+                    return {
+                        "status": "success",
+                        "path": save_path,
+                        "suggested_filename": download.suggested_filename
+                    }
+                except Exception as e:
+                    return {"status": "error", "message": f"Download failed: {str(e)}"}
+            
             elif action == "info":
                 obs = self.controller.get_observation()
                 return {

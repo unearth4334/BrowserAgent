@@ -81,6 +81,14 @@ class BrowserClient:
             "code": code
         })
     
+    def download(self, url: str, save_path: str) -> dict:
+        """Download a file from a URL."""
+        return self.send_command({
+            "action": "download",
+            "url": url,
+            "save_path": save_path
+        })
+    
     def info(self) -> dict:
         """Get current page info."""
         return self.send_command({"action": "info"})
