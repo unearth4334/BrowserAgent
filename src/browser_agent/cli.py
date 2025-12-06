@@ -8,6 +8,7 @@ from .browser.playwright_driver import PlaywrightBrowserController
 from .agent.core import Agent
 from .agent.task_spec import SimpleSearchTaskSpec
 from .interactive_session import InteractiveBrowserSession
+from .server.browser_server import BrowserServer
 
 app = typer.Typer(help="Browser agent CLI")
 
@@ -99,6 +100,39 @@ def interactive(
         session.start()
     else:
         session.start()
+
+
+@app.command()
+def server(
+    url: str | None = typer.Argument(None, help="Initial URL to navigate to (optional)"),
+    port: int = typer.Option(9999, help="Port to listen on"),
+    browser_exe: str | None = typer.Option(
+        None, help="Path to Brave/Chromium executable (optional)"
+    ),
+    no_wait: bool = typer.Option(
+        False, "--no-wait", help="Don't wait for user input before starting server"
+    ),
+):
+    """
+    Start a persistent browser server.
+
+    The server maintains a browser instance and accepts commands via socket.
+    This is useful for workflows that require authentication - authenticate once,
+    then run multiple scripts against the authenticated session.
+
+    Example:
+        browser-agent server https://example.com --browser-exe /usr/bin/brave-browser
+        
+    Then connect from another terminal using BrowserClient:
+        from browser_agent.server import BrowserClient
+        client = BrowserClient()
+        client.goto("https://example.com/page")
+    """
+    env_settings = Settings.from_env()
+    browser_path = browser_exe or env_settings.browser_executable_path
+
+    browser_server = BrowserServer(browser_exe=browser_path, port=port)
+    browser_server.start(initial_url=url, wait_for_auth=not no_wait)
 
 
 def main() -> None:
