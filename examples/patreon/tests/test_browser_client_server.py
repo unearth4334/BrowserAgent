@@ -1,7 +1,5 @@
 """Tests for browser server and client functionality."""
 import json
-import pytest
-
 # Note: These are integration-style tests that test the server/client contract
 # without actually starting a server or browser
 
