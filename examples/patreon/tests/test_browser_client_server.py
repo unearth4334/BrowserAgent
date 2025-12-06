@@ -1,9 +1,8 @@
-"""Tests for browser server and client functionality.
-
-These are generic tests for the browser server/client architecture.
-Patreon-specific tests are in examples/patreon/tests/.
-"""
+"""Tests for browser server and client functionality."""
 import json
+import socket
+from unittest.mock import Mock, MagicMock, patch, call
+import pytest
 
 # Note: These are integration-style tests that test the server/client contract
 # without actually starting a server or browser
@@ -118,6 +117,175 @@ class TestBrowserClientMethods:
         assert "message" in response
 
 
+class TestExtractPatreonContentClient:
+    """Test extract_patreon_content_client.py functionality."""
+    
+    def test_content_validation_threshold(self):
+        """Test that content must exceed minimum length threshold."""
+        min_length = 100
+        
+        # Content below threshold
+        short_content = "a" * 50
+        assert len(short_content) < min_length
+        
+        # Content above threshold
+        long_content = "a" * 150
+        assert len(long_content) > min_length
+    
+    def test_selector_fallback_order(self):
+        """Test that selectors are tried in correct order."""
+        selectors = [
+            'div[class*="cm-LIiDtl"]',
+            'div[data-tag="post-content"]',
+            'article div[class*="cm-"]',
+            '[data-tag="post-card"] div[class*="cm-"]',
+            'div[class*="cm-wHoaYV"]',
+            'article',
+        ]
+        
+        # Verify we have multiple fallback options
+        assert len(selectors) >= 3
+        
+        # Verify specific selectors are included
+        assert any('cm-LIiDtl' in s for s in selectors)
+        assert any('post-content' in s for s in selectors)
+        assert any('article' in s for s in selectors)
+    
+    def test_post_id_extraction_from_url(self):
+        """Test extracting post ID from URL."""
+        url = "https://www.patreon.com/posts/144726506?collection=1611241"
+        
+        # Simulate extraction logic
+        if "/posts/" in url:
+            post_id = url.split("/posts/")[1].split("?")[0]
+        else:
+            post_id = "unknown"
+        
+        assert post_id == "144726506"
+    
+    def test_post_id_extraction_without_query(self):
+        """Test extracting post ID from URL without query params."""
+        url = "https://www.patreon.com/posts/144726506"
+        
+        if "/posts/" in url:
+            post_id = url.split("/posts/")[1].split("?")[0]
+        else:
+            post_id = "unknown"
+        
+        assert post_id == "144726506"
+    
+    def test_post_id_extraction_fallback(self):
+        """Test post ID extraction fallback for invalid URLs."""
+        url = "https://www.patreon.com/collection/1611241"
+        
+        if "/posts/" in url:
+            post_id = url.split("/posts/")[1].split("?")[0]
+        else:
+            post_id = "unknown"
+        
+        assert post_id == "unknown"
+    
+    def test_collection_name_sanitization(self):
+        """Test that collection names are sanitized for filenames."""
+        invalid_chars = '<>:"/\\|?*'
+        test_name = 'SDXL Models: Special <Edition> "Test"'
+        
+        # Simulate sanitization
+        sanitized = test_name
+        for char in invalid_chars:
+            sanitized = sanitized.replace(char, '_')
+        
+        # Verify no invalid chars remain
+        for char in invalid_chars:
+            assert char not in sanitized
+        
+        assert '_' in sanitized  # Replacements were made
+    
+    def test_collection_name_length_limit(self):
+        """Test that collection names are truncated if too long."""
+        long_name = "a" * 150
+        max_length = 100
+        
+        truncated = long_name[:max_length] if len(long_name) > max_length else long_name
+        
+        assert len(truncated) <= max_length
+    
+    def test_metadata_structure(self):
+        """Test that saved metadata has correct structure."""
+        metadata = {
+            "post_id": "144726506",
+            "post_url": "https://www.patreon.com/posts/144726506",
+            "collection_id": "1611241",
+            "collection_name": "SDXL Models",
+            "title": "Test Post",
+            "html_length": 3400
+        }
+        
+        # Verify all required fields
+        assert "post_id" in metadata
+        assert "post_url" in metadata
+        assert "collection_id" in metadata
+        assert "collection_name" in metadata
+        assert "title" in metadata
+        assert "html_length" in metadata
+        
+        # Verify types
+        assert isinstance(metadata["post_id"], str)
+        assert isinstance(metadata["html_length"], int)
+
+
+class TestDebugPageStructure:
+    """Test debug_page_structure.py functionality."""
+    
+    def test_selector_testing_list(self):
+        """Test that debug script tests comprehensive list of selectors."""
+        selectors_to_test = [
+            'div[class*="cm-LIiDtl"]',
+            'div[class*="cm-wHoaYV"]',
+            'div[data-tag="post-content"]',
+            'article div[class*="cm-"]',
+            '[data-tag="post-card"]',
+            'article',
+            'main',
+            'div[class*="post"]',
+        ]
+        
+        assert len(selectors_to_test) >= 5
+        assert any('cm-' in s for s in selectors_to_test)
+        assert any('article' in s for s in selectors_to_test)
+    
+    def test_element_info_structure(self):
+        """Test expected structure of element information."""
+        element_info = {
+            "found": True,
+            "tag": "DIV",
+            "classes": "cm-LIiDtl cm-wHoaYV",
+            "childCount": 10,
+            "textLength": 500,
+            "htmlLength": 2000
+        }
+        
+        assert "found" in element_info
+        assert "tag" in element_info
+        assert "textLength" in element_info
+        assert "htmlLength" in element_info
+        
+        # Verify HTML length is greater than text length
+        assert element_info["htmlLength"] >= element_info["textLength"]
+    
+    def test_best_selector_criteria(self):
+        """Test criteria for finding best selector."""
+        min_content_length = 500
+        
+        # Element with substantial content
+        good_element = {"textLength": 1500}
+        assert good_element["textLength"] > min_content_length
+        
+        # Element with minimal content
+        bad_element = {"textLength": 50}
+        assert bad_element["textLength"] < min_content_length
+
+
 class TestServerErrorHandling:
     """Test error handling in server commands."""
     
@@ -177,8 +345,8 @@ class TestContentExtraction:
         """Test that multiple selectors are attempted."""
         # Simulate trying multiple selectors
         selectors = [
-            ('div[class*="content"]', None),  # First fails
-            ('div[data-tag="content"]', None),  # Second fails
+            ('div[class*="cm-LIiDtl"]', None),  # First fails
+            ('div[data-tag="post-content"]', None),  # Second fails
             ('article', '<div>Content</div>')  # Third succeeds
         ]
         

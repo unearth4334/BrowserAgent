@@ -1,9 +1,19 @@
+"""
+Patreon-specific policy for collection extraction.
+
+This policy orchestrates the steps needed to extract links from a Patreon collection.
+"""
 from __future__ import annotations
 
-from ..browser.actions import Action, Navigate, WaitForUser, ExtractLinks, WaitForSelector
-from ..browser.observation import PageObservation
-from .task_spec import PatreonCollectionTaskSpec, TaskState
-import time
+from browser_agent.browser.actions import Action, Navigate, WaitForUser, ExtractLinks, WaitForSelector
+from browser_agent.browser.observation import PageObservation
+from browser_agent.agent.task_spec import TaskState
+
+# Import task spec from the same package (not as relative import for standalone use)
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from task_spec_patreon import PatreonCollectionTaskSpec
 
 
 class PatreonCollectionPolicy:

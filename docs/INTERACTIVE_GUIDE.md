@@ -11,14 +11,14 @@ browser-agent interactive --browser-exe /usr/bin/brave-browser
 Or start directly at a URL:
 
 ```bash
-browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-browser
+browser-agent interactive https://example.com --browser-exe /usr/bin/brave-browser
 ```
 
 Or with environment variables:
 
 ```bash
 export BROWSER_AGENT_BROWSER_EXE=/usr/bin/brave-browser
-browser-agent interactive https://www.patreon.com
+browser-agent interactive https://example.com
 ```
 
 ## Available Commands
@@ -32,21 +32,21 @@ Once in the interactive session, you can use these commands:
 
 ### Authentication Workflow Example
 ```
-[browser] > goto https://www.patreon.com
-# Manually log in to Patreon in the browser window
+[browser] > goto https://example.com/login
+# Manually log in in the browser window
 # Authentication persists throughout the session!
 
-[browser] > goto https://www.patreon.com/collection/1611241?view=expanded
-[browser] > wait a[href*="/posts/"] 10000
-[browser] > extract a[href*="/posts/"][href*="collection=1611241"]
+[browser] > goto https://example.com/content
+[browser] > wait a[href*="/items/"] 10000
+[browser] > extract a[href*="/items/"]
 [browser] > links
-[browser] > save patreon_links.json
+[browser] > save extracted_links.json
 ```
 
 ### Link Extraction
 - `extract <css-selector>` - Extract all links matching the selector
   - Example: `extract a[href*="/posts/"]`
-  - Example: `extract a.cm-XHOpxu`
+  - Example: `extract a.item-link`
 - `links` - Display previously extracted links
 - `save <filename.json>` - Save extracted links to JSON file
 
@@ -70,23 +70,23 @@ Once in the interactive session, you can use these commands:
 - `help` - Show all commands
 - `quit` or `exit` - Close browser and exit session
 
-## Patreon Collection Extraction Example
+## Example: Extracting Links from a Page
 
-Complete workflow for extracting Patreon collection links:
+Complete workflow for extracting links from a web page:
 
 ```bash
 # Start interactive session
-browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-browser
+browser-agent interactive https://example.com --browser-exe /usr/bin/brave-browser
 
 # In the interactive session:
 [browser] > info
-# (Manually authenticate in the browser window)
+# (Manually authenticate in the browser window if needed)
 
-[browser] > goto https://www.patreon.com/collection/1611241?view=expanded
-[browser] > wait a[href*="/posts/"] 10000
-[browser] > extract a[href*="/posts/"][href*="collection=1611241"]
+[browser] > goto https://example.com/collection/1234
+[browser] > wait a[href*="/items/"] 10000
+[browser] > extract a[href*="/items/"]
 [browser] > links
-[browser] > save collection_1611241.json
+[browser] > save collection_1234.json
 [browser] > quit
 ```
 
@@ -101,13 +101,13 @@ browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-b
 
 2. **Test CSS selectors with JavaScript:**
    ```
-   [browser] > eval document.querySelectorAll('a[href*="/posts/"]').length
+   [browser] > eval document.querySelectorAll('a[href*="/items/"]').length
    ```
 
 3. **Try different selectors if extraction fails:**
    ```
-   [browser] > extract a[href*="/posts/"]
-   [browser] > extract a.post-link
+   [browser] > extract a[href*="/items/"]
+   [browser] > extract a.item-link
    [browser] > eval document.querySelector('a').outerHTML
    ```
 
@@ -131,12 +131,17 @@ When you use `save filename.json`, the file contains:
 
 ```json
 {
-  "url": "https://www.patreon.com/collection/1611241?view=expanded",
+  "url": "https://example.com/collection/1234",
   "count": 42,
   "links": [
-    "https://www.patreon.com/posts/12345?collection=1611241",
-    "https://www.patreon.com/posts/67890?collection=1611241",
+    "https://example.com/items/12345",
+    "https://example.com/items/67890",
     ...
   ]
 }
 ```
+
+## For Site-Specific Examples
+
+See the `examples/` directory for specific use cases:
+- `examples/patreon/` - Patreon collection extraction

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
-from rich import print
 from rich.console import Console
 from rich.table import Table
 

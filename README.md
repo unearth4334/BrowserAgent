@@ -39,13 +39,13 @@ Run in non-headless mode:
 browser-agent simple-search "hello world" --no-headless
 ```
 
-### Interactive Mode (NEW!)
+### Interactive Mode
 
 Start a persistent browser session with a REPL for debugging and manual interaction:
 
 ```bash
 # Start at a specific URL
-browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-browser
+browser-agent interactive https://example.com --browser-exe /usr/bin/brave-browser
 
 # Or start without a URL
 browser-agent interactive --browser-exe /usr/bin/brave-browser
@@ -62,22 +62,15 @@ browser-agent interactive --browser-exe /usr/bin/brave-browser
 
 See [INTERACTIVE_GUIDE.md](INTERACTIVE_GUIDE.md) for full documentation.
 
-### Patreon Collection Extraction
+## Examples
 
-Extract links from a Patreon collection (automated):
+The `examples/` directory contains user-level implementations demonstrating how to use the browser-agent utility:
 
-```bash
-browser-agent patreon-collection 1611241 --browser-exe /usr/bin/brave-browser
-```
-
-Or use interactive mode (recommended - maintains authentication):
-
-```bash
-browser-agent interactive https://www.patreon.com --browser-exe /usr/bin/brave-browser
-# Then use: goto, wait, extract, save commands
-```
-
-See [PATREON_QUICK_START.md](PATREON_QUICK_START.md) for detailed Patreon workflow.
+- **`examples/patreon/`** - Patreon content extraction scripts
+  - Browser server/client architecture for persistent sessions
+  - Collection link extraction
+  - Post content and attachment downloading
+  - See `examples/patreon/README.md` for usage details
 
 ## Testing
 
@@ -107,5 +100,7 @@ browser-agent/
 │  ├─ browser/        # Browser controller and actions
 │  ├─ config.py       # Configuration management
 │  └─ cli.py          # CLI interface
+├─ examples/          # User-level implementations
+│  └─ patreon/        # Patreon extraction example
 └─ tests/             # Test suite
 ```
