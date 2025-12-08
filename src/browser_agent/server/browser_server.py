@@ -119,7 +119,7 @@ class BrowserServer:
             if is_foreground:
                 # Foreground mode - print message and show interactive prompts
                 self.console.print("\n[yellow]⏸  Waiting for authentication...[/yellow]")
-                self.console.print("[dim]Type 'ready' or send 'ready' command via client to continue[/dim]")
+                self.console.print("[dim]Type 'ready' to continue, 'background' to detach, or 'help' for commands[/dim]")
             else:
                 # Background mode - print message but no interactive prompts
                 self.console.print("\n[yellow]⏸  Waiting for 'ready' command from client...[/yellow]")
@@ -191,6 +191,11 @@ class BrowserServer:
                         self.waiting_for_ready = False
                         self.console.print("[green]✓ Server proceeding to main loop[/green]")
                         return
+                    elif command in ("background", "detach", "bg"):
+                        self.waiting_for_ready = False
+                        self.console.print("[green]✓ Entering background mode - server still running[/green]")
+                        self.console.print("[dim]You can now close this terminal or use Ctrl+Z to suspend[/dim]")
+                        return
                     elif command == "quit" or command == "exit":
                         self.console.print("[yellow]Stopping server...[/yellow]")
                         self.running = False
@@ -198,9 +203,11 @@ class BrowserServer:
                         return
                     elif command == "help":
                         self.console.print("\n[bold]Available Commands:[/bold]")
-                        self.console.print("  [cyan]ready[/cyan]   - Continue to main server loop")
-                        self.console.print("  [cyan]status[/cyan]  - Show current page info")
-                        self.console.print("  [cyan]quit[/cyan]    - Stop the server and exit")
+                        self.console.print("  [cyan]ready[/cyan]      - Continue to main server loop")
+                        self.console.print("  [cyan]background[/cyan] - Exit foreground mode, keep server running")
+                        self.console.print("  [cyan]detach[/cyan]     - Same as background")
+                        self.console.print("  [cyan]status[/cyan]     - Show current page info")
+                        self.console.print("  [cyan]quit[/cyan]       - Stop the server and exit")
                         prompt_needed = True  # Show new prompt after help
                     elif command == "status":
                         if self.controller:
@@ -279,9 +286,10 @@ class BrowserServer:
         
         # Print available commands
         self.console.print("\n[bold]Interactive Commands:[/bold]")
-        self.console.print("  [cyan]status[/cyan]  - Show current page info")
-        self.console.print("  [cyan]quit[/cyan]    - Stop the server and exit")
-        self.console.print("  [cyan]help[/cyan]    - Show this help message")
+        self.console.print("  [cyan]status[/cyan]     - Show current page info")
+        self.console.print("  [cyan]background[/cyan] - Exit foreground mode (keep server running)")
+        self.console.print("  [cyan]quit[/cyan]       - Stop the server and exit")
+        self.console.print("  [cyan]help[/cyan]       - Show this help message")
         self.console.print(f"\n[dim]Server is listening for client connections on port {self.port}[/dim]")
         
         if not is_foreground:
@@ -353,6 +361,12 @@ class BrowserServer:
             self.console.print("[yellow]Stopping server...[/yellow]")
             self.running = False
         
+        elif command in ("background", "detach", "bg"):
+            self.console.print("[green]✓ Entering background mode - server still running[/green]")
+            self.console.print("[dim]You can now close this terminal or use Ctrl+Z to suspend[/dim]")
+            # Don't set self.running = False, just return to let server continue
+            return
+        
         elif command == "status":
             if self.controller:
                 obs = self.controller.get_observation()
@@ -366,9 +380,11 @@ class BrowserServer:
         
         elif command == "help":
             self.console.print("\n[bold]Available Commands:[/bold]")
-            self.console.print("  [cyan]status[/cyan]  - Show current page info")
-            self.console.print("  [cyan]quit[/cyan]    - Stop the server and exit")
-            self.console.print("  [cyan]help[/cyan]    - Show this help message")
+            self.console.print("  [cyan]status[/cyan]     - Show current page info")
+            self.console.print("  [cyan]background[/cyan] - Exit foreground mode, keep server running")
+            self.console.print("  [cyan]detach[/cyan]     - Same as background")
+            self.console.print("  [cyan]quit[/cyan]       - Stop the server and exit")
+            self.console.print("  [cyan]help[/cyan]       - Show this help message")
         
         elif command:
             self.console.print(f"[yellow]Unknown command: {command}[/yellow]")

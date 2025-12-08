@@ -12,12 +12,14 @@ Extract model information from Civitai and generate markdown documentation.
    This will:
    - Open a browser window at https://civitai.com/
    - Wait for you to login
-   - Prompt you to press Enter when ready
-   - Start the server to accept commands
+   - Show interactive commands (`ready`, `background`, `status`, `quit`, `help`)
 
 2. **Login to Civitai** in the browser window that opens
 
-3. **Press Enter** in the terminal to start the server
+3. **Choose your mode**:
+   - Type `ready` - Continue with server in foreground (can still type commands)
+   - Type `background` - Detach from terminal, server runs in background
+   - See [Interactive Commands Guide](../../docs/INTERACTIVE_COMMANDS.md) for details
 
 ## Usage
 
