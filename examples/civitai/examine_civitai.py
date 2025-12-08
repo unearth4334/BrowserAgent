@@ -24,6 +24,13 @@ def examine_model_page(model_url: str):
     """Examine a Civitai model page structure."""
     client = BrowserClient()
     
+    # Extract model and version IDs from URL
+    import re
+    model_match = re.search(r'/models/(\d+)', model_url)
+    version_match = re.search(r'modelVersionId=(\d+)', model_url)
+    model_id = model_match.group(1) if model_match else 'unknown'
+    version_id = version_match.group(1) if version_match else 'unknown'
+    
     # Check server connection
     print("[bold]Step 1:[/bold] Connecting to browser server...")
     result = client.ping()
@@ -69,7 +76,7 @@ def examine_model_page(model_url: str):
             print(f"[dim]    Length: {len(html)} chars[/dim]")
             
             # Save to file for inspection
-            output_dir = Path("outputs/civitai")
+            output_dir = Path(f"outputs/civitai/model_{model_id}_{version_id}")
             output_dir.mkdir(parents=True, exist_ok=True)
             
             safe_selector = selector.replace('[', '').replace(']', '').replace('"', '').replace('*', 'wildcard')
@@ -103,7 +110,9 @@ def examine_model_page(model_url: str):
             print("[yellow]  ⚠ 'mantime' not found in HTML[/yellow]")
         
         # Save full HTML for manual inspection
-        output_file = Path("outputs/civitai/full_page.html")
+        output_dir = Path(f"outputs/civitai/model_{model_id}_{version_id}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / "full_page.html"
         with output_file.open('w', encoding='utf-8') as f:
             f.write(html)
         print(f"[dim]  Saved full HTML to: {output_file}[/dim]")
@@ -129,7 +138,7 @@ def examine_model_page(model_url: str):
                 print(f"[dim]{html[:200]}...[/dim]" if len(html) > 200 else f"[dim]{html}[/dim]")
     
     print("\n[bold green]✓ Examination complete![/bold green]")
-    print("[dim]Check outputs/civitai/ for saved HTML files[/dim]")
+    print(f"[dim]Check outputs/civitai/model_{model_id}_{version_id}/ for saved HTML files[/dim]")
 
 
 def main():

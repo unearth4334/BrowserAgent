@@ -25,6 +25,13 @@ def main():
     url = sys.argv[1]
     selector = sys.argv[2]
     
+    # Extract model and version IDs from URL
+    import re
+    model_match = re.search(r'/models/(\d+)', url)
+    version_match = re.search(r'modelVersionId=(\d+)', url)
+    model_id = model_match.group(1) if model_match else 'unknown'
+    version_id = version_match.group(1) if version_match else 'unknown'
+    
     client = BrowserClient()
     
     # Navigate
@@ -50,7 +57,7 @@ def main():
         
         # Save to file
         from pathlib import Path
-        output_dir = Path("outputs/civitai")
+        output_dir = Path(f"outputs/civitai/model_{model_id}_{version_id}")
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Sanitize selector for filename

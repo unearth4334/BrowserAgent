@@ -277,11 +277,11 @@ def main():
     markdown = generate_markdown(info)
     
     # Save to file
-    output_dir = Path("outputs/civitai")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
     model_id = info['model_id'] or 'unknown'
     version_id = info['version_id'] or 'unknown'
+    output_dir = Path(f"outputs/civitai/model_{model_id}_{version_id}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
     output_file = output_dir / f"model_{model_id}_{version_id}.md"
     
     with output_file.open('w', encoding='utf-8') as f:
