@@ -17,7 +17,7 @@ from rich import print
 
 def load_collection_data(collection_id: str) -> dict:
     """Load the collection links from the JSON file."""
-    output_dir = Path("outputs")
+    output_dir = Path("outputs/patreon")
     output_file = output_dir / f"patreon_collection_{collection_id}.json"
     
     if not output_file.exists():
@@ -233,7 +233,7 @@ def save_post_content(post_id: str, post_name: str, post_url: str, collection_id
     """Save post content to files."""
     # Create folder name: POST_<POST_ID>_<POST_NAME>
     folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
-    output_dir = Path("outputs") / folder_name
+    output_dir = Path("outputs/patreon") / folder_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save HTML file
@@ -361,14 +361,14 @@ def main():
     if attachments:
         print(f"\n[bold]Step 6:[/bold] Downloading attachments...")
         folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
-        output_dir = Path("outputs") / folder_name
+        output_dir = Path("outputs/patreon") / folder_name
         downloaded = download_attachments(client, attachments, output_dir)
     else:
         downloaded = {}
     
     print(f"\n[bold green]✓ Extraction complete![/bold green]")
     folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
-    print(f"[dim]Output: outputs/{folder_name}/{post_id}-desc.html[/dim]")
+    print(f"[dim]Output: outputs/patreon/{folder_name}/{post_id}-desc.html[/dim]")
     if attachments:
         print(f"[dim]Attachments: {len(downloaded)}/{len(attachments)} file(s) downloaded to attachments/[/dim]")
 

@@ -45,7 +45,7 @@ def extract_collection_251893():
         print(f"\nFound {len(links)} unique post links")
         
         # Save to file
-        output_file = "outputs/patreon_collection_251893.json"
+        output_file = "outputs/patreon/patreon_collection_251893.json"
         with open(output_file, "w") as f:
             json.dump(links, f, indent=2)
         print(f"Saved links to {output_file}")

@@ -83,7 +83,7 @@ def extract_collection_with_load_more(collection_id="251893"):
         print(f"✓ Found {len(links)} unique post links")
         
         # Save to file
-        output_file = f"outputs/patreon_collection_{collection_id}.json"
+        output_file = f"outputs/patreon/patreon_collection_{collection_id}.json"
         with open(output_file, "w") as f:
             json.dump(links, f, indent=2)
         print(f"✓ Saved links to {output_file}")

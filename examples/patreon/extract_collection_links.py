@@ -117,8 +117,8 @@ def main():
                 print(f"  ... and {len(links) - 10} more")
             
             # Save to file
-            output_dir = Path("outputs")
-            output_dir.mkdir(exist_ok=True)
+            output_dir = Path("outputs/patreon")
+            output_dir.mkdir(parents=True, exist_ok=True)
             output_file = output_dir / f"patreon_collection_{collection_id}.json"
             
             data = {
