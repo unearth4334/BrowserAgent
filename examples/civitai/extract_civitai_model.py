@@ -77,14 +77,18 @@ def extract_model_info(client: BrowserClient, model_url: str) -> dict:
     
     # Try to extract version information
     print("[cyan]→[/cyan] Extracting version info...")
-    # Look for version selector/dropdown
-    result = client.extract_html('[class*="version"], [class*="Version"]')
+    # Look for the selected version button (has cyan icon)
+    result = client.extract_html('button[data-variant="filled"]:has([color="cyan"])')
     if result.get("status") == "success":
         html = result.get("html", "")
-        # Try to find version name/number
-        version_match = re.search(r'v?\d+\.\d+(?:\.\d+)?', html)
+        # Extract text content from the button label
+        # The version text is after the icon, in the format: "VXVII - CrystalClear (Realism)"
+        version_match = re.search(r'>([^<>]+(?:\([^)]+\))?)</', html)
         if version_match:
-            info["version"] = version_match.group()
+            version_text = version_match.group(1).strip()
+            # Clean up any extra whitespace
+            version_text = re.sub(r'\s+', ' ', version_text)
+            info["version"] = version_text
             print(f"[dim]  Version: {info['version']}[/dim]")
     
     # Extract accordion/details content for recommended settings
