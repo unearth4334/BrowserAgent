@@ -132,19 +132,53 @@ class BrowserClient:
     def ping(self) -> dict:
         """Check if server is alive."""
         return self.send_command({"action": "ping"})
+    
+    def ready(self) -> dict:
+        """Signal the server that it's ready to proceed (clears wait state)."""
+        return self.send_command({"action": "ready"})
+    
+    def get_log_file(self) -> dict:
+        """Get the path to the server's log file."""
+        return self.send_command({"action": "get_log_file"})
 
 
 def main():
     """Simple CLI for the browser client."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description="Browser client for controlling a running browser server",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("command", help="Command to execute")
+    parser.add_argument("args", nargs="*", help="Command arguments")
+    parser.add_argument("-f", "--follow", action="store_true", help="Follow log output (like tail -f)")
+    parser.add_argument("--tail", action="store_true", help="Show last N lines and exit")
+    parser.add_argument("-n", "--lines", type=int, default=10, help="Number of lines to show (default: 10)")
+    
+    # Handle legacy command-line format for backward compatibility
     if len(sys.argv) < 2:
         print("Usage: python -m browser_agent.server.browser_client <command> [args...]")
         print("\nCommands:")
-        print("  ping")
-        print("  info")
-        print("  goto <url>")
-        print("  click <selector> [timeout_ms]")
-        print("  wait <selector> [timeout_ms]")
-        print("  extract <selector>")
+        print("  ping                      - Check if server is alive")
+        print("  ready                     - Signal server is ready to proceed")
+        print("  info                      - Get current page info")
+        print("  goto <url>                - Navigate to URL")
+        print("  click <selector> [timeout] - Click an element")
+        print("  wait <selector> [timeout]  - Wait for an element")
+        print("  extract <selector>         - Extract links")
+        print("  logs [-f] [-n N] [--tail]  - View server logs")
+        sys.exit(1)
+    
+    # Special handling for logs command with flags
+    if sys.argv[1] == "logs":
+        args = parser.parse_args(["logs"] + sys.argv[2:])
+        _handle_logs_command(args)
+        return
+    
+    # Parse for other commands (backward compatibility)
+    if len(sys.argv) < 2:
+        parser.print_help()
         sys.exit(1)
     
     client = BrowserClient()
@@ -152,23 +186,84 @@ def main():
     
     if command == "ping":
         result = client.ping()
+    elif command == "ready":
+        result = client.ready()
     elif command == "info":
         result = client.info()
     elif command == "goto":
+        if len(sys.argv) < 3:
+            print("Error: goto requires a URL")
+            sys.exit(1)
         result = client.goto(sys.argv[2])
     elif command == "click":
+        if len(sys.argv) < 3:
+            print("Error: click requires a selector")
+            sys.exit(1)
         timeout = int(sys.argv[3]) if len(sys.argv) > 3 else 5000
         result = client.click(sys.argv[2], timeout)
     elif command == "wait":
+        if len(sys.argv) < 3:
+            print("Error: wait requires a selector")
+            sys.exit(1)
         timeout = int(sys.argv[3]) if len(sys.argv) > 3 else 10000
         result = client.wait(sys.argv[2], timeout)
     elif command == "extract":
+        if len(sys.argv) < 3:
+            print("Error: extract requires a selector")
+            sys.exit(1)
         result = client.extract(sys.argv[2])
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)
     
     print(json.dumps(result, indent=2))
+
+
+def _handle_logs_command(args):
+    """Handle the logs command with follow/tail options."""
+    import time
+    import os
+    
+    client = BrowserClient()
+    
+    # Get log file path from server
+    result = client.get_log_file()
+    if result.get("status") not in ("success", "waiting") or not result.get("log_file"):
+        print(f"Error: {result.get('message', 'Could not get log file path')}")
+        sys.exit(1)
+    
+    log_file = result.get("log_file")
+    if not log_file or not os.path.exists(log_file):
+        print(f"Error: Log file not found: {log_file}")
+        sys.exit(1)
+    
+    if args.follow:
+        # Follow mode: tail -f behavior
+        print(f"Following {log_file} (Ctrl+C to stop)...\n")
+        try:
+            with open(log_file, 'r') as f:
+                # Go to end of file
+                f.seek(0, os.SEEK_END)
+                while True:
+                    line = f.readline()
+                    if line:
+                        print(line, end='')
+                    else:
+                        time.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\nStopped following logs")
+    elif args.tail:
+        # Tail mode: show last N lines and exit
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            for line in lines[-args.lines:]:
+                print(line, end='')
+    else:
+        # Default: show last N lines
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            for line in lines[-args.lines:]:
+                print(line, end='')
 
 
 if __name__ == "__main__":
