@@ -7,8 +7,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-from browser_client import BrowserClient
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+from browser_agent.server.browser_client import BrowserClient
 
 from rich import print
 

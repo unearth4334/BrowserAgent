@@ -77,14 +77,15 @@ background
 
 ## Background Mode Benefits
 
-The `background` command allows you to:
+The `background` command:
+- Stops displaying interactive prompts
+- Closes stdin to allow proper Unix backgrounding
+- Keeps the browser server running and accepting client connections
+- Makes the process ready for Ctrl+Z + bg
 
-1. **Keep the browser session alive** - Don't lose your authentication
-2. **Free up the terminal** - Terminal stops showing prompts, you can use it for client commands
-3. **Continue using the client** - Send commands via client while server runs
-4. **No session loss** - Browser stays open, server keeps running
+After typing `background`, simply press Ctrl+Z then type `bg` to fully background the process.
 
-**Note:** After typing `background`, the terminal will stop showing interactive prompts but the server process continues running. The terminal is available for you to use client commands or other tasks.
+Alternatively, you can use another terminal for client commands while leaving the server running in the foreground.
 
 ## Process Management
 

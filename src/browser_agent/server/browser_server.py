@@ -46,6 +46,7 @@ class BrowserServer:
         self.console = Console()
         self.running = False
         self.waiting_for_ready = False
+        self.in_foreground = True  # Track if we're in foreground mode
     
     def _log(self, message: str, level: str = "INFO"):
         """Log a message to the log file."""
@@ -194,7 +195,13 @@ class BrowserServer:
                     elif command in ("background", "detach", "bg"):
                         self.waiting_for_ready = False
                         self.console.print("[green]✓ Entering background mode - server still running[/green]")
-                        self.console.print("[dim]You can now close this terminal or use Ctrl+Z to suspend[/dim]")
+                        self.console.print("[dim]Process is now ready to be backgrounded. Press Ctrl+Z then type 'bg'[/dim]")
+                        self.in_foreground = False
+                        # Close stdin to allow proper backgrounding
+                        try:
+                            sys.stdin.close()
+                        except:
+                            pass
                         return
                     elif command == "quit" or command == "exit":
                         self.console.print("[yellow]Stopping server...[/yellow]")
@@ -278,11 +285,12 @@ class BrowserServer:
         import os
         import select
         
-        # Check if we're running in foreground
+        # Check if we're running in foreground initially
         try:
             is_foreground = os.getpgrp() == os.tcgetpgrp(sys.stdout.fileno())
+            self.in_foreground = is_foreground
         except:
-            is_foreground = False
+            self.in_foreground = False
         
         # Print available commands
         self.console.print("\n[bold]Interactive Commands:[/bold]")
@@ -292,23 +300,23 @@ class BrowserServer:
         self.console.print("  [cyan]help[/cyan]       - Show this help message")
         self.console.print(f"\n[dim]Server is listening for client connections on port {self.port}[/dim]")
         
-        if not is_foreground:
+        if not self.in_foreground:
             self.console.print("[dim](Running in background mode - use client commands or send SIGTERM to stop)[/dim]")
         
         # Print initial prompt once
-        prompt_needed = is_foreground
+        prompt_needed = self.in_foreground
         
         try:
             while self.running:
                 # Print prompt only when needed (initially or after processing a command)
-                if prompt_needed:
+                if prompt_needed and self.in_foreground:
                     sys.stdout.write("\n> ")
                     sys.stdout.flush()
                     prompt_needed = False
                 
                 # Use select to wait for either socket connection or stdin input
                 readable = [server_socket]
-                if is_foreground:
+                if self.in_foreground:
                     readable.append(sys.stdin)
                 
                 try:
@@ -324,7 +332,7 @@ class BrowserServer:
                     except Exception as e:
                         if self.running:
                             self.console.print(f"\n[red]Error accepting connection: {e}[/red]")
-                            prompt_needed = is_foreground
+                            prompt_needed = self.in_foreground
                     continue
                 
                 # Check if server socket has a connection
@@ -337,16 +345,17 @@ class BrowserServer:
                     except Exception as e:
                         if self.running:
                             self.console.print(f"\n[red]Error accepting connection: {e}[/red]")
-                            prompt_needed = is_foreground  # Re-prompt after error
+                            prompt_needed = self.in_foreground  # Re-prompt after error
                 
                 # Check if stdin has input (only in foreground)
-                if is_foreground and sys.stdin in ready_to_read:
+                if self.in_foreground and sys.stdin in ready_to_read:
                     command = sys.stdin.readline().strip().lower()
                     if command:
                         should_break = self._handle_interactive_command(command)
                         if should_break:
                             break
-                        prompt_needed = True  # Show new prompt after processing command
+                        # Only prompt again if still in foreground (command might have changed it)
+                        prompt_needed = self.in_foreground
                 
         except KeyboardInterrupt:
             self.console.print("\n[yellow]Shutting down...[/yellow]")
@@ -369,7 +378,13 @@ class BrowserServer:
         
         elif command in ("background", "detach", "bg"):
             self.console.print("[green]✓ Entering background mode - server still running[/green]")
-            self.console.print("[dim]Server continues running. Use client to send commands or Ctrl+C to stop[/dim]")
+            self.console.print("[dim]Process is now ready to be backgrounded. Press Ctrl+Z then type 'bg'[/dim]")
+            self.in_foreground = False  # Disable foreground mode
+            # Close stdin to allow proper backgrounding
+            try:
+                sys.stdin.close()
+            except:
+                pass
             return False  # Don't break, continue running in background
         
         elif command == "status":

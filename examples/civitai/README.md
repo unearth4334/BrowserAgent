@@ -17,8 +17,9 @@ Extract model information from Civitai and generate markdown documentation.
 2. **Login to Civitai** in the browser window that opens
 
 3. **Choose your mode**:
-   - Type `ready` - Continue with server in foreground (can still type commands)
-   - Type `background` - Detach from terminal, server runs in background
+   - Type `ready` - Continue with server in foreground
+   - Type `background` then press **Ctrl+Z** and type **`bg`** - Fully background the process
+   - Or use another terminal window for client commands while server runs in foreground
    - See [Interactive Commands Guide](../../docs/INTERACTIVE_COMMANDS.md) for details
 
 ## Usage

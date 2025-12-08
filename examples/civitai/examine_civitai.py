@@ -9,9 +9,9 @@ import sys
 import json
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
-from browser_client import BrowserClient
+# Add src directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+from browser_agent.server.browser_client import BrowserClient
 
 from rich import print
 from rich.console import Console
