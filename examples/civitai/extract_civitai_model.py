@@ -154,6 +154,24 @@ def extract_model_info(client: BrowserClient, model_url: str) -> dict:
     print(f"[dim]  Ecosystem: {info['ecosystem'] or 'unknown'}[/dim]")
     print(f"[dim]  Base Model: {info['basemodel'] or 'unknown'}[/dim]")
     
+    # Extract published date from the table
+    print("[cyan]→[/cyan] Extracting published date...")
+    result = client.extract_html('[class*="Table"]')
+    if result.get("status") == "success":
+        html = result.get("html", "")
+        # Look for "Published" label followed by date
+        published_match = re.search(r'Published</p>.*?<td[^>]*>([^<]+)</td>', html, re.IGNORECASE | re.DOTALL)
+        if published_match:
+            date_str = published_match.group(1).strip()
+            # Convert "Jun 20, 2025" to "2025-06-20"
+            try:
+                from datetime import datetime as dt
+                parsed_date = dt.strptime(date_str, "%b %d, %Y")
+                info["published"] = parsed_date.strftime("%Y-%m-%d")
+                print(f"[dim]  Published: {info['published']}[/dim]")
+            except:
+                print(f"[dim]  Published: {date_str} (could not parse)[/dim]")
+    
     return info
 
 
