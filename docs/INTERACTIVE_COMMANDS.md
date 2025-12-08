@@ -80,9 +80,11 @@ background
 The `background` command allows you to:
 
 1. **Keep the browser session alive** - Don't lose your authentication
-2. **Free up the terminal** - Use the terminal for other commands
+2. **Free up the terminal** - Terminal stops showing prompts, you can use it for client commands
 3. **Continue using the client** - Send commands via client while server runs
 4. **No session loss** - Browser stays open, server keeps running
+
+**Note:** After typing `background`, the terminal will stop showing interactive prompts but the server process continues running. The terminal is available for you to use client commands or other tasks.
 
 ## Process Management
 

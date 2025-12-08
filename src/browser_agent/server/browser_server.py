@@ -343,9 +343,10 @@ class BrowserServer:
                 if is_foreground and sys.stdin in ready_to_read:
                     command = sys.stdin.readline().strip().lower()
                     if command:
-                        self._handle_interactive_command(command)
+                        should_break = self._handle_interactive_command(command)
+                        if should_break:
+                            break
                         prompt_needed = True  # Show new prompt after processing command
-                        break
                 
         except KeyboardInterrupt:
             self.console.print("\n[yellow]Shutting down...[/yellow]")
@@ -355,17 +356,21 @@ class BrowserServer:
                 self.controller.stop()
             self.console.print("[dim]Server stopped[/dim]")
     
-    def _handle_interactive_command(self, command: str):
-        """Handle interactive commands from the console."""
+    def _handle_interactive_command(self, command: str) -> bool:
+        """Handle interactive commands from the console.
+        
+        Returns:
+            bool: True if should break from main loop, False to continue
+        """
         if command == "quit" or command == "exit":
             self.console.print("[yellow]Stopping server...[/yellow]")
             self.running = False
+            return True  # Break from loop to stop server
         
         elif command in ("background", "detach", "bg"):
             self.console.print("[green]✓ Entering background mode - server still running[/green]")
-            self.console.print("[dim]You can now close this terminal or use Ctrl+Z to suspend[/dim]")
-            # Don't set self.running = False, just return to let server continue
-            return
+            self.console.print("[dim]Server continues running. Use client to send commands or Ctrl+C to stop[/dim]")
+            return False  # Don't break, continue running in background
         
         elif command == "status":
             if self.controller:
@@ -377,6 +382,7 @@ class BrowserServer:
                 self.console.print(f"  Inputs: {len(obs.inputs)}")
             else:
                 self.console.print("[red]No browser controller active[/red]")
+            return False  # Don't break, continue
         
         elif command == "help":
             self.console.print("\n[bold]Available Commands:[/bold]")
@@ -385,10 +391,14 @@ class BrowserServer:
             self.console.print("  [cyan]detach[/cyan]     - Same as background")
             self.console.print("  [cyan]quit[/cyan]       - Stop the server and exit")
             self.console.print("  [cyan]help[/cyan]       - Show this help message")
+            return False  # Don't break, continue
         
         elif command:
             self.console.print(f"[yellow]Unknown command: {command}[/yellow]")
             self.console.print("[dim]Type 'help' for available commands[/dim]")
+            return False  # Don't break, continue
+        
+        return False  # Default: don't break
     
     def _handle_client(self, client_socket: socket.socket):
         """Handle a client connection."""
