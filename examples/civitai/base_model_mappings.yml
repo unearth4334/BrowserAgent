@@ -1,0 +1,90 @@
+# Base Model Mappings Configuration
+# Maps Civitai's "Base Model" table values to standardized ecosystem and basemodel values
+#
+# Format:
+#   "Civitai Base Model String":
+#     ecosystem: <sd / sdxl / flux1 / wan / zimage>
+#     basemodel: <sd1.5 / pony / sdxl1.0 / illustrious / wan-2.1 / wan-2.2 / flux1D / zimage>
+
+mappings:
+  # SD 1.5 variants
+  "SD 1.5":
+    ecosystem: sd
+    basemodel: sd1.5
+  "SD1.5":
+    ecosystem: sd
+    basemodel: sd1.5
+  "Stable Diffusion 1.5":
+    ecosystem: sd
+    basemodel: sd1.5
+  
+  # SDXL variants
+  "SDXL 1.0":
+    ecosystem: sdxl
+    basemodel: sdxl1.0
+  "SDXL":
+    ecosystem: sdxl
+    basemodel: sdxl1.0
+  "Stable Diffusion XL":
+    ecosystem: sdxl
+    basemodel: sdxl1.0
+  
+  # Pony
+  "Pony":
+    ecosystem: sdxl
+    basemodel: pony
+  "PonyXL":
+    ecosystem: sdxl
+    basemodel: pony
+  "Pony Diffusion":
+    ecosystem: sdxl
+    basemodel: pony
+  
+  # Illustrious
+  "Illustrious":
+    ecosystem: sdxl
+    basemodel: illustrious
+  "IllustriousXL":
+    ecosystem: sdxl
+    basemodel: illustrious
+  
+  # Flux variants
+  "Flux.1 D":
+    ecosystem: flux1
+    basemodel: flux1D
+  "Flux.1D":
+    ecosystem: flux1
+    basemodel: flux1D
+  "FLUX.1 [dev]":
+    ecosystem: flux1
+    basemodel: flux1D
+  "Flux 1 Dev":
+    ecosystem: flux1
+    basemodel: flux1D
+  
+  # Wan variants
+  "WAN 2.1":
+    ecosystem: wan
+    basemodel: wan-2.1
+  "WAN2.1":
+    ecosystem: wan
+    basemodel: wan-2.1
+  "WAN 2.2":
+    ecosystem: wan
+    basemodel: wan-2.2
+  "WAN2.2":
+    ecosystem: wan
+    basemodel: wan-2.2
+  
+  # ZImage
+  "ZImage":
+    ecosystem: zimage
+    basemodel: zimage
+  "Z-Image":
+    ecosystem: zimage
+    basemodel: zimage
+
+# Default values if no match is found
+default:
+  ecosystem: ""
+  basemodel: ""

@@ -7,6 +7,7 @@ from __future__ import annotations
 import sys
 import json
 import re
+import yaml
 from pathlib import Path
 from datetime import datetime
 
@@ -18,6 +19,18 @@ from rich import print
 from rich.console import Console
 
 console = Console()
+
+
+def load_base_model_mappings() -> dict:
+    """Load base model mappings from YAML configuration."""
+    config_path = Path(__file__).parent / "base_model_mappings.yml"
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            return config.get('mappings', {}), config.get('default', {})
+    except Exception as e:
+        print(f"[yellow]Warning: Could not load base model mappings: {e}[/yellow]")
+        return {}, {"ecosystem": "", "basemodel": ""}
 
 
 def extract_model_info(client: BrowserClient, model_url: str) -> dict:
@@ -129,27 +142,40 @@ def extract_model_info(client: BrowserClient, model_url: str) -> dict:
                 if sampler_match:
                     info["sampler"] = sampler_match.group(1).strip()
     
-    # Look for metadata/tags that might indicate ecosystem
+    # Extract base model and ecosystem from the table
     print("[cyan]→[/cyan] Detecting ecosystem and base model...")
-    result = client.extract_html("body")
+    result = client.extract_html('[class*="Table"]')
     if result.get("status") == "success":
-        html = result.get("html", "").lower()
+        html = result.get("html", "")
         
-        # Detect ecosystem
-        if "flux" in html:
-            info["ecosystem"] = "flux1"
-            info["basemodel"] = "flux1D"
-        elif "sdxl" in html or "xl" in html:
-            info["ecosystem"] = "sdxl"
-            if "pony" in html:
-                info["basemodel"] = "pony"
-            elif "illustrious" in html:
-                info["basemodel"] = "illustrious"
+        # Look for "Base Model" label followed by the model name
+        # The structure is: <td>Base Model</td><td>...<p>SDXL 1.0</p>...</td>
+        base_model_match = re.search(r'Base Model</p>.*?<td[^>]*>.*?<p[^>]*>([^<]+?)(?:<!--.*?-->)?\s*</p>', html, re.IGNORECASE | re.DOTALL)
+        if base_model_match:
+            base_model_str = base_model_match.group(1).strip()
+            print(f"[dim]  Found Base Model: {base_model_str}[/dim]")
+            
+            # Load mappings and find match
+            mappings, default = load_base_model_mappings()
+            
+            # Try exact match first
+            if base_model_str in mappings:
+                info["ecosystem"] = mappings[base_model_str]["ecosystem"]
+                info["basemodel"] = mappings[base_model_str]["basemodel"]
             else:
-                info["basemodel"] = "sdxl1.0"
-        elif "sd 1.5" in html or "sd1.5" in html:
-            info["ecosystem"] = "sd"
-            info["basemodel"] = "sd1.5"
+                # Try case-insensitive match
+                found = False
+                for key, value in mappings.items():
+                    if key.lower() == base_model_str.lower():
+                        info["ecosystem"] = value["ecosystem"]
+                        info["basemodel"] = value["basemodel"]
+                        found = True
+                        break
+                
+                if not found:
+                    print(f"[yellow]  Warning: No mapping found for '{base_model_str}', using defaults[/yellow]")
+                    info["ecosystem"] = default["ecosystem"]
+                    info["basemodel"] = default["basemodel"]
     
     print(f"[dim]  Ecosystem: {info['ecosystem'] or 'unknown'}[/dim]")
     print(f"[dim]  Base Model: {info['basemodel'] or 'unknown'}[/dim]")
