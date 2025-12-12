@@ -6,6 +6,10 @@ from browser_agent.browser.actions import (
     WaitForUser,
     ExtractLinks,
     ExtractHTML,
+    ExecuteJS,
+    UploadFile,
+    SelectOption,
+    SetSlider,
 )
 
 
@@ -44,3 +48,30 @@ def test_extract_html_action():
     # Test with different selectors
     eh2 = ExtractHTML(selector='#main-content')
     assert eh2.selector == '#main-content'
+
+
+def test_execute_js_action():
+    """Test ExecuteJS action initialization."""
+    ejs = ExecuteJS(code="return document.title;")
+    assert ejs.code == "return document.title;"
+
+
+def test_upload_file_action():
+    """Test UploadFile action initialization."""
+    uf = UploadFile(selector="input[type=file]", file_path="/tmp/test.png")
+    assert uf.selector == "input[type=file]"
+    assert uf.file_path == "/tmp/test.png"
+
+
+def test_select_option_action():
+    """Test SelectOption action initialization."""
+    so = SelectOption(selector="select#country", value="US")
+    assert so.selector == "select#country"
+    assert so.value == "US"
+
+
+def test_set_slider_action():
+    """Test SetSlider action initialization."""
+    ss = SetSlider(selector="input[type=range]", value=50.5)
+    assert ss.selector == "input[type=range]"
+    assert ss.value == 50.5

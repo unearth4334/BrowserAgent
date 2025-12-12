@@ -45,4 +45,43 @@ class ExtractHTML:
     selector: str  # CSS selector to match elements
 
 
-Action = Union[Navigate, Click, Type, WaitForSelector, WaitForUser, ExtractLinks, ExtractHTML]
+@dataclass
+class ExecuteJS:
+    """Execute JavaScript code in the page context."""
+    code: str
+
+
+@dataclass
+class UploadFile:
+    """Upload a file to a file input element."""
+    selector: str
+    file_path: str
+
+
+@dataclass
+class SelectOption:
+    """Select an option from a dropdown/select element."""
+    selector: str
+    value: str
+
+
+@dataclass
+class SetSlider:
+    """Set a slider value."""
+    selector: str
+    value: float
+
+
+Action = Union[
+    Navigate,
+    Click,
+    Type,
+    WaitForSelector,
+    WaitForUser,
+    ExtractLinks,
+    ExtractHTML,
+    ExecuteJS,
+    UploadFile,
+    SelectOption,
+    SetSlider,
+]

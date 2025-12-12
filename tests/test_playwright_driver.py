@@ -48,8 +48,14 @@ def test_playwright_controller_start():
         assert controller._browser is not None
         assert controller._page is not None
         
-        mock_playwright.chromium.launch.assert_called_once_with(headless=True)
+        # Check that launch was called with headless=True, timeout, and default args for headless chromium
+        call_args = mock_playwright.chromium.launch.call_args
+        assert call_args.kwargs["headless"] is True
+        assert call_args.kwargs["timeout"] == 15000
+        assert "--no-sandbox" in call_args.kwargs["args"]
         mock_browser.new_page.assert_called_once()
+        mock_page.set_default_timeout.assert_called_once_with(30000)
+        mock_page.set_default_navigation_timeout.assert_called_once_with(30000)
 
 
 def test_playwright_controller_start_with_executable_path():
@@ -70,10 +76,11 @@ def test_playwright_controller_start_with_executable_path():
         
         controller.start()
         
-        mock_playwright.chromium.launch.assert_called_once_with(
-            headless=False,
-            executable_path="/usr/bin/brave"
-        )
+        # Check that launch was called with correct parameters
+        call_args = mock_playwright.chromium.launch.call_args
+        assert call_args.kwargs["headless"] is False
+        assert call_args.kwargs["executable_path"] == "/usr/bin/brave"
+        assert call_args.kwargs["timeout"] == 15000
 
 
 def test_playwright_controller_start_already_started():
