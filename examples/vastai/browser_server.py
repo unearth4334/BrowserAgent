@@ -9,44 +9,55 @@ from pathlib import Path
 import sys
 
 
-def load_credentials(credentials_file: Path) -> tuple[str, str, str]:
-    """Load credentials and URL from the credentials file.
+def load_credentials(credentials_file: Path) -> tuple[str, str, str, str]:
+    """Load credentials, URL, and workflow path from the credentials file.
     
     Returns:
-        tuple[str, str, str]: username, password, url
+        tuple[str, str, str, str]: username, password, url, workflow_path
     """
     if not credentials_file.exists():
         raise FileNotFoundError(
             f"Credentials file not found: {credentials_file}\n"
             "Please create it with format:\n"
             "  Line 1: username:password\n"
-            "  Line 2: url"
+            "  Line 2: url\n"
+            "  Line 3: workflow_path"
         )
     
     content = credentials_file.read_text().strip()
     username = None
     password = None
     url = None
+    workflow_path = None
     
-    # Parse the file looking for credentials and URL
+    # Parse the file looking for credentials, URL, and workflow
+    non_comment_lines = []
     for line in content.split("\n"):
         line = line.strip()
         if line and not line.startswith("#"):
-            if ":" in line and username is None:
-                # First line with colon is username:password
-                username, password = line.split(":", 1)
-                username = username.strip()
-                password = password.strip()
-            elif line.startswith("http"):
-                # Line starting with http is the URL
-                url = line.strip()
+            non_comment_lines.append(line)
     
-    parser.add_argument(
-        "--url",
-        default=None,
-        help="Vast.ai URL (overrides URL from credentials file)",
-    )       "  Line 1: username:password\n"
-            "  Line 2: url"
+    # First line with colon is username:password
+    if len(non_comment_lines) >= 1 and ":" in non_comment_lines[0]:
+        username, password = non_comment_lines[0].split(":", 1)
+        username = username.strip()
+        password = password.strip()
+    
+    # Second line is URL
+    if len(non_comment_lines) >= 2:
+        url = non_comment_lines[1].strip()
+    
+    # Third line is workflow path (optional)
+    if len(non_comment_lines) >= 3:
+        workflow_path = non_comment_lines[2].strip()
+    
+    if not username or not password:
+        raise ValueError(
+            f"Invalid credentials format in {credentials_file}\n"
+            "Expected format:\n"
+            "  Line 1: username:password\n"
+            "  Line 2: url\n"
+            "  Line 3: workflow_path (optional)"
         )
     
     if not url:
@@ -54,10 +65,11 @@ def load_credentials(credentials_file: Path) -> tuple[str, str, str]:
             f"URL not found in {credentials_file}\n"
             "Expected format:\n"
             "  Line 1: username:password\n"
-            "  Line 2: url"
+            "  Line 2: url\n"
+            "  Line 3: workflow_path (optional)"
         )
     
-    return username, password, url
+    return username, password, url, workflow_path
 
 
 def main():
@@ -71,8 +83,13 @@ def main():
     )
     parser.add_argument(
         "--url",
-        default="https://disks-gba-says-facts.trycloudflare.com/",
-        help="Vast.ai URL (default: %(default)s)",
+        default=None,
+        help="Vast.ai URL (overrides URL from credentials file)",
+    )
+    parser.add_argument(
+        "--workflow",
+        default=None,
+        help="ComfyUI workflow path (overrides workflow from credentials file)",
     )
     parser.add_argument(
         "--port",
@@ -94,14 +111,21 @@ def main():
     
     args = parser.parse_args()
     
-    # Load credentials and URL
+    # Load credentials, URL, and workflow
     try:
-        username, password, url = load_credentials(args.credentials_file)
+        username, password, url, workflow_path = load_credentials(args.credentials_file)
         print(f"✅ Loaded credentials for user: {username}")
         print(f"✅ Loaded URL: {url}")
+        if workflow_path:
+            print(f"✅ Loaded workflow: {workflow_path}")
     except (FileNotFoundError, ValueError) as e:
         print(f"❌ Error: {e}", file=sys.stderr)
         return 1
+    
+    # Use command-line arguments if provided, otherwise use from credentials file
+    target_url = args.url if args.url else url
+    target_workflow = args.workflow if args.workflow else workflow_path
+    
     # Build URL with credentials for HTTP basic auth
     if "://" in target_url:
         scheme, rest = target_url.split("://", 1)
@@ -111,10 +135,8 @@ def main():
     
     print(f"\n🚀 Starting browser server on port {args.port}")
     print(f"   Target URL: {target_url}")
-        auth_url = f"https://{username}:{password}@{args.url}"
-    
-    print(f"\n🚀 Starting browser server on port {args.port}")
-    print(f"   Target URL: {args.url}")
+    if target_workflow:
+        print(f"   Workflow: {target_workflow}")
     print(f"   Browser: {args.browser_exe}")
     print()
     
