@@ -45,3 +45,6 @@ Thumbs.db
 
 # Output files
 outputs/
+
+# Credentials
+vastai_credentials.txt
