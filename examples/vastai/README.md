@@ -25,14 +25,27 @@ playwright install chromium
 
 ### 2. Configure Credentials
 
-Create or edit the `vastai_credentials.txt` file in the project root:
+Copy the example credentials file and fill in your actual credentials:
 
 ```bash
-# Format: username:password
-myusername:mypassword
+cp vastai_credentials.txt.example vastai_credentials.txt
+# Edit vastai_credentials.txt with your credentials
 ```
 
-**Important**: This file is already added to `.gitignore` to prevent accidental credential commits.
+Format:
+```text
+# Line 1: username:password
+# Line 2: url (your randomly generated instance URL)
+
+myusername:mypassword
+https://your-instance.trycloudflare.com/
+```
+
+**Important**: 
+- `vastai_credentials.txt` is already in `.gitignore` to prevent accidental credential commits
+- Only `vastai_credentials.txt.example` (with placeholder values) is committed to the repo
+
+**Note**: The URL is randomly generated when you create a vast.ai instance, so update it each time you create a new instance.
 
 ## Usage
 
@@ -41,14 +54,29 @@ myusername:mypassword
 Authenticate with a vast.ai instance:
 
 ```bash
-# Using default URL (from script)
+# Using URL from credentials file
 python examples/vastai/vastai_auth.py
 
-# With custom URL
-python examples/vastai/vastai_auth.py --url https://your-vastai-instance.com/
+# Override with custom URL
+python examples/vastai/vastai_auth.py --url https://different-instance.trycloudflare.com/
 
 # In headless mode
 python examples/vastai/vastai_auth.py --headless
+```
+
+### Browser Server
+
+Start a persistent browser server with authentication:
+
+```bash
+# Using URL from credentials file
+python examples/vastai/browser_server.py --browser-exe /usr/bin/brave-browser
+
+# Override with custom URL
+python examples/vastai/browser_server.py --browser-exe /usr/bin/brave-browser --url https://different-instance.trycloudflare.com/
+
+# On a different port
+python examples/vastai/browser_server.py --browser-exe /usr/bin/brave-browser --port 9998
 ```
 
 ### Custom Credentials File

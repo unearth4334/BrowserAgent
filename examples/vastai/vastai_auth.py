@@ -30,27 +30,55 @@ from task_spec_vastai import VastAiAuthTaskSpec
 from policy_vastai import VastAiAuthPolicy
 
 
-def load_credentials(credentials_file: Path) -> tuple[str, str]:
-    """Load credentials from the credentials file."""
+def load_credentials(credentials_file: Path) -> tuple[str, str, str]:
+    """Load credentials and URL from the credentials file.
+    
+    Returns:
+        tuple[str, str, str]: username, password, url
+    """
     if not credentials_file.exists():
         raise FileNotFoundError(
             f"Credentials file not found: {credentials_file}\n"
-            "Please create it with format: username:password"
+            "Please create it with format:\n"
+            "  Line 1: username:password\n"
+            "  Line 2: url"
         )
     
     content = credentials_file.read_text().strip()
-    # Skip comments and empty lines
+    username = None
+    password = None
+    url = None
+    
+    # Parse the file looking for credentials and URL
     for line in content.split("\n"):
         line = line.strip()
         if line and not line.startswith("#"):
-            if ":" in line:
+            if ":" in line and username is None:
+                # First line with colon is username:password
                 username, password = line.split(":", 1)
-                return username.strip(), password.strip()
+                username = username.strip()
+                password = password.strip()
+            elif line.startswith("http"):
+                # Line starting with http is the URL
+                url = line.strip()
     
-    raise ValueError(
-        f"Invalid credentials format in {credentials_file}\n"
-        "Expected format: username:password"
-    )
+    if not username or not password:
+        raise ValueError(
+            f"Invalid credentials format in {credentials_file}\n"
+            "Expected format:\n"
+            "  Line 1: username:password\n"
+            "  Line 2: url"
+        )
+    
+    if not url:
+        raise ValueError(
+            f"URL not found in {credentials_file}\n"
+            "Expected format:\n"
+            "  Line 1: username:password\n"
+            "  Line 2: url"
+        )
+    
+    return username, password, url
 
 
 def main():
@@ -61,8 +89,8 @@ def main():
     )
     parser.add_argument(
         "--url",
-        default="https://disks-gba-says-facts.trycloudflare.com/",
-        help="Vast.ai URL to authenticate with (default: %(default)s)",
+        default=None,
+        help="Vast.ai URL to authenticate with (overrides URL from credentials file)",
     )
     parser.add_argument(
         "--headless",
@@ -78,17 +106,21 @@ def main():
     
     args = parser.parse_args()
     
-    # Load credentials
+    # Load credentials and URL
     try:
-        username, password = load_credentials(args.credentials_file)
+        username, password, url = load_credentials(args.credentials_file)
         print(f"Loaded credentials for user: {username}")
+        print(f"Loaded URL: {url}")
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     
+    # Use command-line URL if provided, otherwise use from credentials file
+    target_url = args.url if args.url else url
+    
     # Create task spec
     task = VastAiAuthTaskSpec(
-        target_url=args.url,
+        target_url=target_url,
         username=username,
         password=password,
     )
