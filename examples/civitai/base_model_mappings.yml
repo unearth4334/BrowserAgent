@@ -95,6 +95,14 @@ mappings:
     ecosystem: wan
     basemodel: wan-2.2
     hashtag: "#Wan-2_2"
+  "Wan Video 2.2 I2V-A14B":
+    ecosystem: wan
+    basemodel: wan-2.2
+    hashtag: "#Wan-2_2"
+  "Wan Video 2.2":
+    ecosystem: wan
+    basemodel: wan-2.2
+    hashtag: "#Wan-2_2"
   
   # ZImage
   "ZImage":
