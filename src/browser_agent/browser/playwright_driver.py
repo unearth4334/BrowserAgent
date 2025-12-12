@@ -52,6 +52,7 @@ class PlaywrightBrowserController:
     _page: Optional[Page] = field(default=None, init=False)
     _extracted_links: list[str] = field(default_factory=list, init=False)
     _extracted_html: str = field(default="", init=False)
+    _last_js_result: any = field(default=None, init=False)
 
     def start(self) -> None:
         if self._browser is not None:
@@ -205,6 +206,7 @@ class PlaywrightBrowserController:
             elif isinstance(action, ExecuteJS):
                 # Execute JavaScript in page context
                 result = page.evaluate(action.code)
+                self._last_js_result = result
                 logger.info("Executed JS, result: %s", result)
             elif isinstance(action, UploadFile):
                 # Upload file to input element
@@ -252,3 +254,7 @@ class PlaywrightBrowserController:
     def get_extracted_html(self) -> str:
         """Return the extracted HTML from the last ExtractHTML action."""
         return self._extracted_html
+    
+    def get_last_js_result(self) -> any:
+        """Return the result from the last ExecuteJS action."""
+        return self._last_js_result

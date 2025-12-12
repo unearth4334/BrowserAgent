@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import json
 import typer
 from rich import print
+from pathlib import Path
 
 from .config import Settings
 from .browser.playwright_driver import PlaywrightBrowserController
 from .agent.core import Agent
-from .agent.task_spec import SimpleSearchTaskSpec, PatreonCollectionTaskSpec
+from .agent.task_spec import SimpleSearchTaskSpec, PatreonCollectionTaskSpec, ComfyUIWorkflowTaskSpec
 from .agent.policy_patreon import PatreonCollectionPolicy
+from .agent.policy_comfyui import ComfyUIWorkflowPolicy
+from .agent.workflow_runner import CanvasWorkflowRunner
 from .interactive_session import InteractiveBrowserSession
 
 app = typer.Typer(help="Browser agent CLI")
@@ -170,6 +174,119 @@ def interactive(
         session.start()
     else:
         session.start()
+
+
+@app.command()
+def run_canvas(
+    workflow: str = typer.Argument(..., help="Path to the workflow JSON file"),
+    webui_url: str = typer.Option(
+        "http://localhost:8188",
+        help="URL of the ComfyUI WebUI"
+    ),
+    params: str | None = typer.Option(
+        None,
+        help='JSON string with parameters, e.g. \'{"node_1": {"field": "value"}}\''
+    ),
+    headless: bool = typer.Option(
+        True, "--headless/--no-headless", help="Run browser in headless mode"
+    ),
+    browser_exe: str | None = typer.Option(
+        None, help="Path to Brave/Chromium executable (optional)"
+    ),
+    max_wait: int = typer.Option(
+        600, help="Maximum time in seconds to wait for workflow completion"
+    ),
+):
+    """
+    Execute a ComfyUI canvas workflow.
+    
+    This command will:
+    1. Launch a headless browser
+    2. Navigate to the ComfyUI WebUI
+    3. Load the specified workflow
+    4. Apply any parameters
+    5. Trigger execution
+    6. Wait for completion
+    
+    Example:
+        browser-agent run-canvas /path/to/workflow.json \\
+            --webui-url http://localhost:8188 \\
+            --params '{"3": {"seed": 42}, "4": {"steps": 20}}'
+    """
+    env_settings = Settings.from_env()
+    settings = Settings(
+        browser_executable_path=browser_exe or env_settings.browser_executable_path,
+        headless=headless,
+    )
+    
+    # Parse parameters if provided
+    parameters = {}
+    if params:
+        try:
+            parameters = json.loads(params)
+        except json.JSONDecodeError as e:
+            print(f"[red]Error:[/red] Invalid JSON in params: {e}")
+            raise typer.Exit(code=1)
+    
+    # Create controller with enhanced settings for headless mode
+    controller = PlaywrightBrowserController(
+        executable_path=settings.browser_executable_path,
+        headless=settings.headless,
+        browser_type=settings.browser_type,
+        launch_timeout=settings.launch_timeout,
+        navigation_timeout=settings.navigation_timeout,
+        default_wait=settings.default_wait,
+        extra_launch_args=settings.extra_launch_args,
+        screenshot_on_error=True,
+    )
+    
+    try:
+        # Start the browser
+        controller.start()
+        
+        # Create workflow runner
+        runner = CanvasWorkflowRunner(
+            browser=controller,
+            webui_url=webui_url,
+            max_wait_time=float(max_wait),
+        )
+        
+        # Load workflow
+        print(f"[blue]Loading workflow:[/blue] {workflow}")
+        runner.load_workflow(workflow)
+        
+        # Set parameters
+        if parameters:
+            print(f"[blue]Applying parameters...[/blue]")
+            for node_id, fields in parameters.items():
+                for field_name, value in fields.items():
+                    runner.set_parameter(node_id, field_name, value)
+        
+        # Execute workflow
+        print(f"[blue]Executing workflow...[/blue]")
+        runner.run()
+        
+        # Wait for completion
+        print(f"[blue]Waiting for completion (max {max_wait}s)...[/blue]")
+        success = runner.wait_for_completion()
+        
+        if success:
+            print(f"[green]Success:[/green] Workflow completed successfully")
+            raise typer.Exit(code=0)
+        else:
+            print(f"[yellow]Warning:[/yellow] Workflow did not complete within timeout")
+            raise typer.Exit(code=2)
+            
+    except FileNotFoundError as e:
+        print(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        print(f"[red]Error:[/red] {e}")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+    finally:
+        controller.stop()
 
 
 def main() -> None:
