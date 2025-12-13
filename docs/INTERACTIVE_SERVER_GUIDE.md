@@ -17,7 +17,7 @@ When starting with authentication wait, you can proceed in two ways:
 ```bash
 python -m browser_agent.server.browser_client ready
 # or
-.venv/bin/python test_ready_command.py
+.venv/bin/python tests/integration/test_ready_command.py
 ```
 
 ### 3. Interactive Commands
@@ -115,7 +115,7 @@ client.download(url, path) # Download file
 
 Run the demo script:
 ```bash
-./test_server_demo.sh
+./tests/integration/test_server_demo.sh
 ```
 
 Or test manually:

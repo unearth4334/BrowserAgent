@@ -36,12 +36,12 @@ echo "Step 2: Server is now waiting for authentication..."
 echo "        You can either:"
 echo "        a) Type 'ready' in the server terminal"
 echo "        b) Run: python -m browser_agent.server.browser_client ready"
-echo "        c) Use the test script: .venv/bin/python test_ready_command.py"
+echo "        c) Use the test script: .venv/bin/python tests/integration/test_ready_command.py"
 echo ""
 echo "Step 3: Demonstrating option (c) - sending 'ready' via client..."
 echo ""
 
-.venv/bin/python test_ready_command.py
+.venv/bin/python tests/integration/test_ready_command.py
 
 echo ""
 echo "============================================"

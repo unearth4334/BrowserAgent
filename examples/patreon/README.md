@@ -82,3 +82,15 @@ This example also demonstrates how to create custom policies and task specs:
 - **`task_spec_patreon.py`** - Task specification for Patreon tasks
 
 These can be used with the browser-agent's Agent class for automated workflows.
+
+## Testing
+
+The `tests/` directory contains integration test scripts:
+
+- **`test_extract_all_251893.py`** - Test extracting all posts from collection 251893
+- **`test_extract_collection_251893.py`** - Test collection link extraction
+- **`test_load_more_251893.py`** - Test pagination and load-more functionality
+- **`test_inspect_page.py`** - Inspect page structure for debugging
+- **`test_aggressive_scroll.py`** - Test aggressive scrolling for lazy-loaded content
+
+These are practical test scripts that work with actual Patreon collections (requires authentication).
