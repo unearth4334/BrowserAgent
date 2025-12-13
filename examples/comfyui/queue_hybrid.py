@@ -129,7 +129,19 @@ def load_and_export_workflow(
         // Use ComfyUI's graphToPrompt method which converts to API format
         try {
             const prompt = await app.graphToPrompt();
-            return {api_format: prompt.workflow};
+            
+            // Debug: check what we got
+            const promptKeys = Object.keys(prompt);
+            const workflowKeys = prompt.workflow ? Object.keys(prompt.workflow) : [];
+            const outputKeys = prompt.output ? Object.keys(prompt.output) : [];
+            
+            return {
+                prompt_keys: promptKeys,
+                workflow_keys: workflowKeys.slice(0, 10),
+                output_keys: outputKeys.slice(0, 10),
+                has_output: !!prompt.output,
+                output_sample: prompt.output ? JSON.stringify(prompt.output).substring(0, 200) : null
+            };
         } catch (e) {
             return {error: 'graphToPrompt failed: ' + e.message};
         }
@@ -140,13 +152,30 @@ def load_and_export_workflow(
         print(f"   ❌ Export failed: {result}")
         return None
     
-    api_workflow = result.get("result", {}).get("api_format")
+    debug_info = result.get("result", {})
+    print(f"   Debug info: {debug_info}")
+    
+    # Try to get the actual API workflow
+    result2 = client.eval_js("""
+    async () => {
+        const app = window.app;
+        const prompt = await app.graphToPrompt();
+        // The API format is in prompt.output, not prompt.workflow!
+        return {api_format: prompt.output};
+    }
+    """)
+    
+    if result2.get("status") != "success":
+        print(f"   ❌ Failed to get API format: {result2}")
+        return None
+    
+    api_workflow = result2.get("result", {}).get("api_format")
     
     if not api_workflow:
         print("   ❌ No API format returned")
         return None
     
-    print(f"   ✅ Exported API format")
+    print(f"   ✅ Exported API format with {len(api_workflow)} nodes")
     
     return api_workflow
 
