@@ -30,7 +30,7 @@ class BrowserServer:
         server.start(initial_url="https://example.com")
     """
     
-    def __init__(self, browser_exe: str | None = None, port: int = 9999, log_file: str | None = None):
+    def __init__(self, browser_exe: str | None = None, port: int = 9999, log_file: str | None = None, headless: bool = False):
         """
         Initialize the browser server.
         
@@ -38,9 +38,11 @@ class BrowserServer:
             browser_exe: Path to browser executable (optional)
             port: Port to listen on (default: 9999)
             log_file: Path to log file (optional, defaults to /tmp/browser_server_{port}.log)
+            headless: Run browser in headless mode (default: False)
         """
         self.port = port
         self.browser_exe = browser_exe
+        self.headless = headless
         self.log_file = log_file or f"/tmp/browser_server_{port}.log"
         self.controller: PlaywrightBrowserController | None = None
         self.console = Console()
@@ -86,7 +88,7 @@ class BrowserServer:
         # Start browser
         self.controller = PlaywrightBrowserController(
             executable_path=self.browser_exe,
-            headless=False,
+            headless=self.headless,
         )
         self.controller.start()
         self.console.print("[green]✓ Browser started[/green]")

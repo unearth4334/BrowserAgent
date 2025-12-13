@@ -336,3 +336,129 @@ def test_playwright_controller_get_extracted_links_returns_copy():
     # Should be equal but not the same object
     assert links1 == links2
     assert links1 is not links2
+
+
+def test_playwright_controller_headless_with_default_args():
+    """Test that headless mode includes default security args."""
+    controller = PlaywrightBrowserController(headless=True)
+    
+    with patch('browser_agent.browser.playwright_driver.sync_playwright') as mock_pw:
+        mock_playwright = MagicMock()
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        
+        mock_pw.return_value.start.return_value = mock_playwright
+        mock_playwright.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+        
+        controller.start()
+        
+        call_args = mock_playwright.chromium.launch.call_args
+        args = call_args.kwargs.get("args", [])
+        
+        # Check that default headless args are included
+        assert "--no-sandbox" in args
+        assert "--disable-setuid-sandbox" in args
+        assert "--disable-dev-shm-usage" in args
+
+
+def test_playwright_controller_non_headless_no_default_args():
+    """Test that non-headless mode doesn't include default security args."""
+    controller = PlaywrightBrowserController(headless=False)
+    
+    with patch('browser_agent.browser.playwright_driver.sync_playwright') as mock_pw:
+        mock_playwright = MagicMock()
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        
+        mock_pw.return_value.start.return_value = mock_playwright
+        mock_playwright.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+        
+        controller.start()
+        
+        call_args = mock_playwright.chromium.launch.call_args
+        args = call_args.kwargs.get("args", [])
+        
+        # Non-headless should have empty args by default
+        assert args == []
+
+
+def test_playwright_controller_firefox_headless():
+    """Test launching Firefox in headless mode."""
+    controller = PlaywrightBrowserController(browser_type="firefox", headless=True)
+    
+    with patch('browser_agent.browser.playwright_driver.sync_playwright') as mock_pw:
+        mock_playwright = MagicMock()
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        
+        mock_pw.return_value.start.return_value = mock_playwright
+        mock_playwright.firefox.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+        
+        controller.start()
+        
+        # Verify firefox was launched
+        mock_playwright.firefox.launch.assert_called_once()
+        call_args = mock_playwright.firefox.launch.call_args
+        assert call_args.kwargs["headless"] is True
+
+
+def test_playwright_controller_webkit_headless():
+    """Test launching WebKit in headless mode."""
+    controller = PlaywrightBrowserController(browser_type="webkit", headless=True)
+    
+    with patch('browser_agent.browser.playwright_driver.sync_playwright') as mock_pw:
+        mock_playwright = MagicMock()
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        
+        mock_pw.return_value.start.return_value = mock_playwright
+        mock_playwright.webkit.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+        
+        controller.start()
+        
+        # Verify webkit was launched
+        mock_playwright.webkit.launch.assert_called_once()
+        call_args = mock_playwright.webkit.launch.call_args
+        assert call_args.kwargs["headless"] is True
+
+
+def test_playwright_controller_extra_launch_args_with_headless():
+    """Test that extra launch args replace default headless args."""
+    controller = PlaywrightBrowserController(
+        headless=True,
+        extra_launch_args=["--disable-gpu", "--window-size=1920,1080"]
+    )
+    
+    with patch('browser_agent.browser.playwright_driver.sync_playwright') as mock_pw:
+        mock_playwright = MagicMock()
+        mock_browser = MagicMock()
+        mock_page = MagicMock()
+        
+        mock_pw.return_value.start.return_value = mock_playwright
+        mock_playwright.chromium.launch.return_value = mock_browser
+        mock_browser.new_page.return_value = mock_page
+        
+        controller.start()
+        
+        call_args = mock_playwright.chromium.launch.call_args
+        args = call_args.kwargs.get("args", [])
+        
+        # When extra_launch_args is provided, it replaces the default args
+        assert "--disable-gpu" in args
+        assert "--window-size=1920,1080" in args
+        assert len(args) == 2  # Only the custom args
+
+
+def test_playwright_controller_headless_parameter():
+    """Test that headless parameter is correctly stored."""
+    # Test with headless=True
+    controller_headless = PlaywrightBrowserController(headless=True)
+    assert controller_headless.headless is True
+    
+    # Test with headless=False
+    controller_not_headless = PlaywrightBrowserController(headless=False)
+    assert controller_not_headless.headless is False

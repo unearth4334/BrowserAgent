@@ -218,40 +218,41 @@ def test_interactive_function_without_url():
         mock_session.start.assert_called_once()
 
 
-def test_server_command_with_defaults():
-    """Test server command with default settings."""
-    with patch('browser_agent.cli.BrowserServer') as MockServer, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = None
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_server = MagicMock()
-        MockServer.return_value = mock_server
-        
-        from browser_agent.cli import server
-        server(port=9999, url="https://example.com", no_wait=False, browser_exe=None)
-        
-        MockServer.assert_called_once_with(browser_exe=None, port=9999)
-        mock_server.start.assert_called_once_with(initial_url="https://example.com", wait_for_auth=True)
-
-
-def test_server_command_with_browser_exe():
-    """Test server command with custom browser executable."""
-    with patch('browser_agent.cli.BrowserServer') as MockServer, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = "/usr/bin/brave-browser"
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_server = MagicMock()
-        MockServer.return_value = mock_server
-        
-        from browser_agent.cli import server
-        server(port=8080, url="https://example.com", no_wait=True, browser_exe="/usr/bin/firefox")
-        
-        # Should use explicit browser_exe, not env settings
-        MockServer.assert_called_once_with(browser_exe="/usr/bin/firefox", port=8080)
-        mock_server.start.assert_called_once_with(initial_url="https://example.com", wait_for_auth=False)
+# Server command tests removed - server command no longer in CLI
+# def test_server_command_with_defaults():
+#     """Test server command with default settings."""
+#     with patch('browser_agent.cli.BrowserServer') as MockServer, \
+#          patch('browser_agent.cli.Settings.from_env') as mock_from_env:
+#         
+#         mock_env_settings = MagicMock()
+#         mock_env_settings.browser_executable_path = None
+#         mock_from_env.return_value = mock_env_settings
+#         
+#         mock_server = MagicMock()
+#         MockServer.return_value = mock_server
+#         
+#         from browser_agent.cli import server
+#         server(port=9999, url="https://example.com", no_wait=False, browser_exe=None)
+#         
+#         MockServer.assert_called_once_with(browser_exe=None, port=9999)
+#         mock_server.start.assert_called_once_with(initial_url="https://example.com", wait_for_auth=True)
+# 
+# 
+# def test_server_command_with_browser_exe():
+#     """Test server command with custom browser executable."""
+#     with patch('browser_agent.cli.BrowserServer') as MockServer, \
+#          patch('browser_agent.cli.Settings.from_env') as mock_from_env:
+#         
+#         mock_env_settings = MagicMock()
+#         mock_env_settings.browser_executable_path = "/usr/bin/brave-browser"
+#         mock_from_env.return_value = mock_env_settings
+#         
+#         mock_server = MagicMock()
+#         MockServer.return_value = mock_server
+#         
+#         from browser_agent.cli import server
+#         server(port=8080, url="https://example.com", no_wait=True, browser_exe="/usr/bin/firefox")
+#         
+#         # Should use explicit browser_exe, not env settings
+#         MockServer.assert_called_once_with(browser_exe="/usr/bin/firefox", port=8080)
+#         mock_server.start.assert_called_once_with(initial_url="https://example.com", wait_for_auth=False)

@@ -103,6 +103,11 @@ def main():
         help="Browser executable path (default: %(default)s)",
     )
     parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run browser in headless mode",
+    )
+    parser.add_argument(
         "--credentials-file",
         type=Path,
         default=project_root / "vastai_credentials.txt",
@@ -138,10 +143,11 @@ def main():
     if target_workflow:
         print(f"   Workflow: {target_workflow}")
     print(f"   Browser: {args.browser_exe}")
+    print(f"   Headless: {args.headless}")
     print()
     
     # Create and start server (without wait_for_auth since HTTP basic auth is automatic)
-    server = BrowserServer(browser_exe=args.browser_exe, port=args.port)
+    server = BrowserServer(browser_exe=args.browser_exe, port=args.port, headless=args.headless)
     server.start(initial_url=auth_url, wait_for_auth=False)
 
 

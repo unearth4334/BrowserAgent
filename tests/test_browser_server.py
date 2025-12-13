@@ -21,6 +21,57 @@ class TestBrowserServer:
         server = BrowserServer(browser_exe="/usr/bin/brave-browser", port=8888)
         assert server.port == 8888
         assert server.browser_exe == "/usr/bin/brave-browser"
+        assert server.headless is False  # Default value
+
+    def test_browser_server_initialization_with_headless(self):
+        """Test BrowserServer can be initialized with headless mode."""
+        server = BrowserServer(headless=True)
+        assert server.headless is True
+        assert server.port == 9999
+
+    def test_browser_server_initialization_with_all_params(self):
+        """Test BrowserServer with all parameters."""
+        server = BrowserServer(
+            browser_exe="/usr/bin/chromium",
+            port=7777,
+            headless=True,
+            log_file="/tmp/test.log"
+        )
+        assert server.port == 7777
+        assert server.browser_exe == "/usr/bin/chromium"
+        assert server.headless is True
+        assert server.log_file == "/tmp/test.log"
+
+    def test_browser_server_headless_propagates_to_controller(self):
+        """Test that headless parameter is stored correctly."""
+        server = BrowserServer(headless=True)
+        assert server.headless is True
+
+    def test_browser_server_non_headless_propagates_to_controller(self):
+        """Test that headless=False is stored correctly."""
+        server = BrowserServer(headless=False)
+        assert server.headless is False
+
+    def test_browser_server_default_headless_is_false(self):
+        """Test that BrowserServer defaults to headless=False."""
+        server = BrowserServer()
+        assert server.headless is False
+
+    def test_browser_server_with_custom_browser_exe(self):
+        """Test BrowserServer with custom browser executable."""
+        server = BrowserServer(
+            browser_exe="/usr/bin/firefox",
+            headless=True
+        )
+        assert server.browser_exe == "/usr/bin/firefox"
+        assert server.headless is True
+
+    def test_browser_server_port_and_headless_combination(self):
+        """Test BrowserServer with custom port and headless mode."""
+        server = BrowserServer(port=8888, headless=True)
+        assert server.port == 8888
+        assert server.headless is True
+        assert server.log_file == "/tmp/browser_server_8888.log"
 
 
 class TestBrowserClient:

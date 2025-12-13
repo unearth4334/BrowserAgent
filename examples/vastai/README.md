@@ -170,6 +170,204 @@ Ensure Playwright browsers are installed:
 playwright install chromium
 ```
 
+## REST API Server
+
+For integration with other applications, use the REST API server which allows you to provide credentials via API requests instead of files.
+
+### Installation
+
+Install API dependencies:
+
+```bash
+pip install -r examples/vastai/requirements-api.txt
+```
+
+### Starting the API Server
+
+```bash
+python examples/vastai/api_server.py --host 0.0.0.0 --port 8000
+```
+
+The API server will be available at `http://localhost:8000` with interactive documentation at `http://localhost:8000/docs`.
+
+### API Endpoints
+
+#### 1. Start Session
+
+Start an authenticated browser session:
+
+```bash
+curl -X POST http://localhost:8000/session/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credentials": {
+      "username": "myuser",
+      "password": "mypass",
+      "url": "https://your-instance.trycloudflare.com"
+    },
+    "port": 9999,
+    "headless": true
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Browser session started on port 9999",
+  "details": {
+    "port": 9999,
+    "url": "https://***:***@your-instance.trycloudflare.com",
+    "headless": true
+  }
+}
+```
+
+#### 2. Get Session Status
+
+Check if a browser session is active:
+
+```bash
+curl http://localhost:8000/session/status
+```
+
+Response:
+```json
+{
+  "active": true,
+  "port": 9999,
+  "url": "https://your-instance.trycloudflare.com"
+}
+```
+
+#### 3. Open Workflow
+
+Open a ComfyUI workflow:
+
+```bash
+curl -X POST http://localhost:8000/workflow/open \
+  -H "Content-Type: application/json" \
+  -d '{
+    "workflow_path": "workflows/my_workflow.json",
+    "port": 9999
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Successfully opened workflow: workflows/my_workflow.json"
+}
+```
+
+#### 4. Queue Workflow
+
+Queue workflow executions:
+
+```bash
+curl -X POST http://localhost:8000/workflow/queue \
+  -H "Content-Type: application/json" \
+  -d '{
+    "iterations": 5,
+    "port": 9999
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Successfully queued 5 workflow execution(s)",
+  "details": {
+    "iterations": 5
+  }
+}
+```
+
+#### 5. Stop Session
+
+Stop the browser session:
+
+```bash
+curl -X POST http://localhost:8000/session/stop
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Browser session on port 9999 stopped"
+}
+```
+
+### Complete Workflow Example
+
+```bash
+# 1. Start API server
+python examples/vastai/api_server.py &
+
+# 2. Start authenticated session
+curl -X POST http://localhost:8000/session/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credentials": {
+      "username": "myuser",
+      "password": "mypass",
+      "url": "https://your-instance.trycloudflare.com"
+    },
+    "headless": true
+  }'
+
+# 3. Open workflow
+curl -X POST http://localhost:8000/workflow/open \
+  -H "Content-Type: application/json" \
+  -d '{"workflow_path": "workflows/my_workflow.json"}'
+
+# 4. Queue 10 executions
+curl -X POST http://localhost:8000/workflow/queue \
+  -H "Content-Type: application/json" \
+  -d '{"iterations": 10}'
+
+# 5. Stop session when done
+curl -X POST http://localhost:8000/session/stop
+```
+
+### Python Client Example
+
+```python
+import requests
+
+API_URL = "http://localhost:8000"
+
+# Start session
+response = requests.post(f"{API_URL}/session/start", json={
+    "credentials": {
+        "username": "myuser",
+        "password": "mypass",
+        "url": "https://your-instance.trycloudflare.com"
+    },
+    "headless": True
+})
+print(response.json())
+
+# Open workflow
+response = requests.post(f"{API_URL}/workflow/open", json={
+    "workflow_path": "workflows/my_workflow.json"
+})
+print(response.json())
+
+# Queue executions
+response = requests.post(f"{API_URL}/workflow/queue", json={
+    "iterations": 5
+})
+print(response.json())
+
+# Stop session
+response = requests.post(f"{API_URL}/session/stop")
+print(response.json())
+```
+
 ## Example Output
 
 ```
