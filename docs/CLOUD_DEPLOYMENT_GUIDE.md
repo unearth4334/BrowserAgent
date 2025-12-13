@@ -192,8 +192,8 @@ curl -s http://localhost:18188 | head -20
 # Navigate to BrowserAgent examples directory
 cd /root/BrowserAgent/examples/comfyui
 
-# Run the simple workflow queue script (requires a workflow file)
-PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 queue_workflow_simple.py \
+# Run the UI-click workflow queue script (requires a workflow file)
+PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 queue_workflow_ui_click.py \
     --workflow-path /path/to/workflow.json \
     --comfyui-url http://localhost:18188
 
@@ -205,7 +205,7 @@ PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 queue_workflow_simple.py \
 # ✓ Workflow queued successfully! Prompt ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-**Note**: The `queue_workflow_simple.py` script includes critical 0.5-second timing delays at 6 points for reliable execution.
+**Note**: The `queue_workflow_ui_click.py` script uses UI-native queuing (clicks Queue button) for full compatibility with custom nodes that require UI metadata.
 
 ## Common Issues and Solutions
 
@@ -290,7 +290,501 @@ WebUI (Local) ──SSH──> Cloud Instance (BrowserAgent)
                               └─> ComfyUI (port 18188)
 ```
 
-### WebUI Implementation Steps
+### Complete WebUI Workflow Queue Implementation
+
+This section provides a production-ready implementation for queuing ComfyUI workflows from your WebUI.
+
+#### Prerequisites
+
+```python
+# Required Python packages in your WebUI environment
+pip install paramiko
+```
+
+#### Full Implementation
+
+```python
+import paramiko
+import re
+import time
+from pathlib import Path
+
+class ComfyUIWorkflowQueue:
+    """
+    Manages ComfyUI workflow queuing via BrowserAgent on a remote cloud instance.
+    
+    Features:
+    - SSH connection management
+    - Browser server lifecycle management
+    - Workflow file transfer
+    - Automatic server startup and health checks
+    - Prompt ID extraction and status tracking
+    """
+    
+    def __init__(self, hostname, port, username, key_filename=None, 
+                 browser_agent_path="/root/BrowserAgent",
+                 comfyui_url="http://localhost:18188"):
+        """
+        Initialize connection to cloud instance.
+        
+        Args:
+            hostname: Cloud instance IP/hostname
+            port: SSH port (e.g., 19361 for vast.ai)
+            username: SSH username (typically 'root')
+            key_filename: Path to SSH private key (optional)
+            browser_agent_path: Path to BrowserAgent on remote instance
+            comfyui_url: ComfyUI URL on remote instance
+        """
+        self.hostname = hostname
+        self.port = port
+        self.username = username
+        self.key_filename = key_filename
+        self.browser_agent_path = browser_agent_path
+        self.comfyui_url = comfyui_url
+        self.ssh = None
+        self.sftp = None
+    
+    def connect(self):
+        """Establish SSH connection to cloud instance."""
+        self.ssh = paramiko.SSHClient()
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        if self.key_filename:
+            self.ssh.connect(
+                hostname=self.hostname,
+                port=self.port,
+                username=self.username,
+                key_filename=self.key_filename,
+                timeout=10
+            )
+        else:
+            self.ssh.connect(
+                hostname=self.hostname,
+                port=self.port,
+                username=self.username,
+                timeout=10
+            )
+        
+        self.sftp = self.ssh.open_sftp()
+        print(f"✓ Connected to {self.hostname}:{self.port}")
+    
+    def disconnect(self):
+        """Close SSH and SFTP connections."""
+        if self.sftp:
+            self.sftp.close()
+        if self.ssh:
+            self.ssh.close()
+        print("✓ Disconnected from cloud instance")
+    
+    def run_command(self, command, timeout=30):
+        """
+        Execute command on remote instance.
+        
+        Returns:
+            tuple: (stdout, stderr, exit_code)
+        """
+        stdin, stdout, stderr = self.ssh.exec_command(command, timeout=timeout)
+        exit_code = stdout.channel.recv_exit_status()
+        return (
+            stdout.read().decode('utf-8'),
+            stderr.read().decode('utf-8'),
+            exit_code
+        )
+    
+    def is_browser_server_running(self):
+        """
+        Check if browser server is running on remote instance.
+        
+        Returns:
+            bool: True if server is running
+        """
+        stdout, stderr, _ = self.run_command(
+            "ps aux | grep 'browser_agent.server.browser_server' | grep -v grep"
+        )
+        return "browser_server" in stdout
+    
+    def start_browser_server(self, port=8765):
+        """
+        Start browser server on remote instance.
+        
+        Args:
+            port: Port for browser server (default: 8765)
+            
+        Returns:
+            bool: True if server started successfully
+        """
+        if self.is_browser_server_running():
+            print("✓ Browser server already running")
+            return True
+        
+        print("⏳ Starting browser server...")
+        
+        # Start server in background
+        start_command = (
+            f"cd {self.browser_agent_path} && "
+            f"PYTHONPATH={self.browser_agent_path}/src:$PYTHONPATH "
+            f"nohup python3 -m browser_agent.server.browser_server "
+            f"--port {port} --headless "
+            f"> /tmp/browser_server_{port}.log 2>&1 &"
+        )
+        
+        stdout, stderr, exit_code = self.run_command(start_command)
+        
+        # Wait for server to initialize
+        time.sleep(3)
+        
+        # Verify server is running
+        if self.is_browser_server_running():
+            print(f"✓ Browser server started on port {port}")
+            return True
+        else:
+            print(f"✗ Failed to start browser server")
+            print(f"Error: {stderr}")
+            return False
+    
+    def stop_browser_server(self):
+        """Stop browser server on remote instance."""
+        if not self.is_browser_server_running():
+            print("✓ Browser server not running")
+            return
+        
+        print("⏳ Stopping browser server...")
+        self.run_command("pkill -f browser_agent.server.browser_server")
+        time.sleep(1)
+        
+        if not self.is_browser_server_running():
+            print("✓ Browser server stopped")
+        else:
+            print("⚠ Browser server may still be running")
+    
+    def upload_workflow(self, local_workflow_path, remote_path="/tmp/workflow.json"):
+        """
+        Upload workflow JSON file to remote instance.
+        
+        Args:
+            local_workflow_path: Path to local workflow JSON file
+            remote_path: Destination path on remote instance
+            
+        Returns:
+            bool: True if upload successful
+        """
+        try:
+            self.sftp.put(local_workflow_path, remote_path)
+            print(f"✓ Uploaded workflow to {remote_path}")
+            return True
+        except Exception as e:
+            print(f"✗ Failed to upload workflow: {e}")
+            return False
+    
+    def queue_workflow(self, workflow_path_on_remote, use_ui_method=True):
+        """
+        Queue workflow for execution in ComfyUI.
+        
+        Args:
+            workflow_path_on_remote: Path to workflow JSON on remote instance
+            use_ui_method: Use UI-click method (True) or HTTP API method (False)
+                          UI method recommended for compatibility with all custom nodes
+        
+        Returns:
+            str or None: Prompt ID if successful, None if failed
+        """
+        # Ensure browser server is running
+        if not self.is_browser_server_running():
+            if not self.start_browser_server():
+                return None
+        
+        # Choose queuing script
+        script_name = "queue_workflow_ui_click.py" if use_ui_method else "queue_workflow_simple.py"
+        
+        print(f"⏳ Queuing workflow using {'UI-click' if use_ui_method else 'HTTP API'} method...")
+        
+        # Execute queue command
+        queue_command = (
+            f"cd {self.browser_agent_path}/examples/comfyui && "
+            f"PYTHONPATH={self.browser_agent_path}/src:$PYTHONPATH "
+            f"python3 {script_name} "
+            f"--workflow-path {workflow_path_on_remote} "
+            f"--comfyui-url {self.comfyui_url}"
+        )
+        
+        stdout, stderr, exit_code = self.run_command(queue_command, timeout=60)
+        
+        if exit_code != 0:
+            print(f"✗ Queue command failed with exit code {exit_code}")
+            print(f"Error: {stderr}")
+            return None
+        
+        # Extract prompt ID from output
+        match = re.search(r'Prompt ID: ([a-f0-9-]+)', stdout)
+        if match:
+            prompt_id = match.group(1)
+            print(f"✓ Workflow queued successfully!")
+            print(f"  Prompt ID: {prompt_id}")
+            return prompt_id
+        else:
+            print("⚠ Workflow may be queued but prompt ID not found in output")
+            print(f"Output: {stdout}")
+            return None
+    
+    def check_workflow_status(self, prompt_id):
+        """
+        Check execution status of a queued workflow.
+        
+        Args:
+            prompt_id: Prompt ID returned from queue_workflow()
+            
+        Returns:
+            dict: Status information with keys 'state', 'message'
+                 state: 'pending', 'running', 'completed', 'failed', 'unknown'
+        """
+        # Check queue status
+        check_command = f"curl -s {self.comfyui_url}/queue"
+        stdout, stderr, _ = self.run_command(check_command)
+        
+        try:
+            import json
+            queue_data = json.loads(stdout)
+            
+            # Check if in running queue
+            running = queue_data.get('queue_running', [])
+            for item in running:
+                if prompt_id in str(item):
+                    return {'state': 'running', 'message': 'Workflow is currently executing'}
+            
+            # Check if in pending queue
+            pending = queue_data.get('queue_pending', [])
+            for item in pending:
+                if prompt_id in str(item):
+                    return {'state': 'pending', 'message': 'Workflow is waiting in queue'}
+            
+            # Check history for completion/failure
+            history_command = f"curl -s {self.comfyui_url}/history/{prompt_id}"
+            stdout, stderr, _ = self.run_command(history_command)
+            history_data = json.loads(stdout)
+            
+            if prompt_id in history_data:
+                prompt_history = history_data[prompt_id]
+                status = prompt_history.get('status', {})
+                
+                if status.get('completed'):
+                    return {'state': 'completed', 'message': 'Workflow completed successfully'}
+                elif 'messages' in prompt_history and prompt_history['messages']:
+                    # Check for errors in messages
+                    return {'state': 'failed', 'message': f"Workflow failed: {prompt_history['messages']}"}
+                else:
+                    return {'state': 'completed', 'message': 'Workflow finished'}
+            
+            return {'state': 'unknown', 'message': 'Workflow not found in queue or history'}
+            
+        except Exception as e:
+            return {'state': 'unknown', 'message': f'Error checking status: {e}'}
+
+
+# Example Usage in WebUI
+def queue_comfyui_workflow_example():
+    """
+    Example function showing how to use ComfyUIWorkflowQueue in your WebUI.
+    """
+    
+    # Initialize queue manager with your cloud instance details
+    queue_manager = ComfyUIWorkflowQueue(
+        hostname="172.219.157.164",  # Your cloud instance IP
+        port=19361,                   # SSH port
+        username="root",              # SSH username
+        key_filename="~/.ssh/id_rsa", # Path to SSH key (optional)
+        browser_agent_path="/root/BrowserAgent",
+        comfyui_url="http://localhost:18188"
+    )
+    
+    try:
+        # Connect to cloud instance
+        queue_manager.connect()
+        
+        # Upload workflow file generated by your WebUI
+        local_workflow_file = "/path/to/generated/workflow.json"
+        remote_workflow_path = "/tmp/my_workflow.json"
+        
+        if not queue_manager.upload_workflow(local_workflow_file, remote_workflow_path):
+            print("Failed to upload workflow")
+            return None
+        
+        # Queue the workflow
+        # Use use_ui_method=True for full compatibility (recommended)
+        # Use use_ui_method=False for slightly faster execution if workflow doesn't use UI-dependent nodes
+        prompt_id = queue_manager.queue_workflow(
+            workflow_path_on_remote=remote_workflow_path,
+            use_ui_method=True  # Recommended for maximum compatibility
+        )
+        
+        if not prompt_id:
+            print("Failed to queue workflow")
+            return None
+        
+        # Optional: Check status
+        status = queue_manager.check_workflow_status(prompt_id)
+        print(f"Status: {status['state']} - {status['message']}")
+        
+        return prompt_id
+        
+    finally:
+        # Always disconnect
+        queue_manager.disconnect()
+
+
+# Simplified single-function interface for WebUI integration
+def queue_workflow_from_webui(hostname, port, username, key_filename,
+                                local_workflow_path, comfyui_url="http://localhost:18188"):
+    """
+    Simplified function to queue a workflow from WebUI.
+    
+    Args:
+        hostname: Cloud instance IP/hostname
+        port: SSH port
+        username: SSH username
+        key_filename: Path to SSH private key
+        local_workflow_path: Path to workflow JSON file on local machine
+        comfyui_url: ComfyUI URL on remote instance
+    
+    Returns:
+        str or None: Prompt ID if successful, None if failed
+    """
+    queue_manager = ComfyUIWorkflowQueue(
+        hostname=hostname,
+        port=port,
+        username=username,
+        key_filename=key_filename,
+        comfyui_url=comfyui_url
+    )
+    
+    try:
+        queue_manager.connect()
+        
+        # Upload workflow
+        remote_path = f"/tmp/workflow_{int(time.time())}.json"
+        if not queue_manager.upload_workflow(local_workflow_path, remote_path):
+            return None
+        
+        # Queue with UI method for maximum compatibility
+        prompt_id = queue_manager.queue_workflow(remote_path, use_ui_method=True)
+        
+        return prompt_id
+        
+    finally:
+        queue_manager.disconnect()
+```
+
+#### Integration into Your WebUI
+
+**Step 1: Add the Queue Manager Class**
+
+Copy the `ComfyUIWorkflowQueue` class into your WebUI codebase (e.g., `utils/comfyui_queue.py`).
+
+**Step 2: Configure Connection Details**
+
+```python
+# In your WebUI configuration
+CLOUD_INSTANCE = {
+    'hostname': '172.219.157.164',
+    'port': 19361,
+    'username': 'root',
+    'key_filename': '~/.ssh/id_rsa',  # Or None to use ssh-agent
+    'browser_agent_path': '/root/BrowserAgent',
+    'comfyui_url': 'http://localhost:18188'
+}
+```
+
+**Step 3: Queue Workflow from WebUI**
+
+```python
+# In your WebUI workflow generation code
+def on_generate_video_clicked(workflow_data):
+    """Handler for 'Generate Video' button in WebUI."""
+    
+    # 1. Generate workflow JSON
+    workflow_json_path = save_workflow_to_file(workflow_data)
+    
+    # 2. Queue on cloud instance
+    queue_manager = ComfyUIWorkflowQueue(**CLOUD_INSTANCE)
+    
+    try:
+        queue_manager.connect()
+        
+        # Upload and queue
+        remote_path = "/tmp/webui_workflow.json"
+        queue_manager.upload_workflow(workflow_json_path, remote_path)
+        prompt_id = queue_manager.queue_workflow(remote_path, use_ui_method=True)
+        
+        if prompt_id:
+            # Store prompt_id for status tracking
+            save_prompt_id_to_database(prompt_id)
+            show_success_message(f"Queued successfully! ID: {prompt_id}")
+        else:
+            show_error_message("Failed to queue workflow")
+            
+    except Exception as e:
+        show_error_message(f"Error: {e}")
+    finally:
+        queue_manager.disconnect()
+```
+
+**Step 4: Monitor Workflow Status (Optional)**
+
+```python
+def check_workflow_progress(prompt_id):
+    """Check progress of a previously queued workflow."""
+    
+    queue_manager = ComfyUIWorkflowQueue(**CLOUD_INSTANCE)
+    
+    try:
+        queue_manager.connect()
+        status = queue_manager.check_workflow_status(prompt_id)
+        
+        return status  # {'state': 'running', 'message': '...'}
+        
+    finally:
+        queue_manager.disconnect()
+```
+
+### Key Features
+
+1. **Automatic Server Management**: Checks if browser server is running, starts it if needed
+2. **Robust Error Handling**: Comprehensive error checking and reporting
+3. **Status Tracking**: Check workflow execution status anytime
+4. **Method Selection**: Choose between UI-click (maximum compatibility) or HTTP API (faster)
+5. **Connection Lifecycle**: Proper SSH connection management with cleanup
+
+### Performance Notes
+
+- **Initial startup**: ~3 seconds for browser server initialization
+- **Workflow queue**: ~5-7 seconds per workflow (UI method)
+- **Status check**: <1 second per check
+- **SSH connection**: ~1-2 seconds to establish
+
+### Troubleshooting WebUI Integration
+
+**Issue: SSH connection timeout**
+```python
+# Increase timeout in connect()
+self.ssh.connect(..., timeout=30)
+```
+
+**Issue: Browser server fails to start**
+```python
+# Check server logs on remote instance
+queue_manager.run_command("cat /tmp/browser_server_8765.log")
+```
+
+**Issue: Workflow upload fails**
+```python
+# Verify SFTP connection
+try:
+    queue_manager.sftp.stat(remote_path)
+    print("File uploaded successfully")
+except:
+    print("Upload failed")
+```
+
+### WebUI Implementation Steps (Legacy Reference)
 
 1. **SSH Connection Management**
    ```python
@@ -334,46 +828,6 @@ WebUI (Local) ──SSH──> Cloud Instance (BrowserAgent)
    
    if "235 passed" in output:
        print("✓ Installation verified successfully")
-   ```
-
-4. **Browser Server Management**
-   ```python
-   # Start server
-   ssh.exec_command(
-       "cd /root/BrowserAgent && "
-       "PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH "
-       "nohup python3 -m browser_agent.server.browser_server "
-       "--port 8765 --headless > browser_server.log 2>&1 &"
-   )
-   
-   # Check server status
-   output, _ = run_remote_command(ssh, "ps aux | grep browser_server | grep -v grep")
-   server_running = "browser_server" in output
-   ```
-
-5. **Workflow Queue Operations**
-   ```python
-   # Upload workflow file
-   sftp = ssh.open_sftp()
-   sftp.put('local_workflow.json', '/tmp/workflow.json')
-   sftp.close()
-   
-   # Queue workflow
-   queue_command = (
-       "cd /root/BrowserAgent/examples/comfyui && "
-       "PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH "
-       "python3 queue_workflow_simple.py "
-       "--workflow-path /tmp/workflow.json "
-       "--comfyui-url http://localhost:18188"
-   )
-   output, error = run_remote_command(ssh, queue_command)
-   
-   # Parse prompt ID from output
-   import re
-   match = re.search(r'Prompt ID: ([a-f0-9-]+)', output)
-   if match:
-       prompt_id = match.group(1)
-       print(f"Queued workflow: {prompt_id}")
    ```
 
 ## Performance Considerations
