@@ -130,12 +130,15 @@ def main():
         print(f"   ✅ API format ready ({info.get('node_count')} nodes)")
         print(f"   Sample node IDs: {info.get('sample_nodes')}\n")
     
-    # Get the actual API workflow
+    # Get the actual API workflow AND UI workflow for metadata
     result = client.eval_js("""
     async () => {
         const app = window.app;
         const prompt = await app.graphToPrompt();
-        return {api_format: prompt.output};
+        return {
+            api_format: prompt.output,
+            ui_workflow: prompt.workflow
+        };
     }
     """)
     
@@ -144,14 +147,20 @@ def main():
         return 1
     
     api_workflow = result["result"]["api_format"]
+    ui_workflow = result["result"]["ui_workflow"]
     time.sleep(0.5)  # Delay that was at screenshot point
     
-    # Queue via HTTP API
-    print("📍 Step 6: Queue workflow via HTTP API...")
+    # Queue via HTTP API with extra_pnginfo metadata
+    print("📍 Step 6: Queue workflow via HTTP API (with UI metadata)...")
     try:
         response = requests.post(
             f"{comfyui_url}/prompt",
-            json={"prompt": api_workflow},
+            json={
+                "prompt": api_workflow,
+                "extra_pnginfo": {
+                    "workflow": ui_workflow
+                }
+            },
             headers={"Content-Type": "application/json"}
         )
         response.raise_for_status()
