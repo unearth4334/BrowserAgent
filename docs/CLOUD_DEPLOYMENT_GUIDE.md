@@ -33,16 +33,27 @@ ssh -p <PORT> <USER>@<HOST>
 ssh -p 19361 root@172.219.157.164
 ```
 
-### 2. Clone BrowserAgent Repository
+### 2. Clone or Update BrowserAgent Repository
 
 ```bash
 # Navigate to desired installation directory
 cd /root  # or your preferred location
 
-# Clone the repository
-git clone https://github.com/unearth4334/BrowserAgent.git
-cd BrowserAgent
+# Clone the repository (first-time setup)
+if [ ! -d "BrowserAgent" ]; then
+    git clone https://github.com/unearth4334/BrowserAgent.git
+    cd BrowserAgent
+    git checkout main
+else
+    # Update existing installation
+    cd BrowserAgent
+    git fetch origin
+    git checkout main
+    git pull origin main
+fi
 ```
+
+**Note**: This command checks if BrowserAgent already exists. If it does, it updates to the latest version from the main branch. If not, it clones a fresh copy.
 
 ### 3. Install System Dependencies
 
@@ -52,7 +63,7 @@ BrowserAgent uses Playwright which requires several system libraries for Chromiu
 # Update package list
 apt-get update
 
-# Install required system libraries
+# Install required system libraries (will show "already installed" if present)
 apt-get install -y \
     libnss3 \
     libnspr4 \
@@ -77,24 +88,28 @@ apt-get install -y \
 ### 4. Install Python Dependencies
 
 ```bash
-# Install BrowserAgent package (use regular install, not editable mode)
-pip install .
+# Install/upgrade BrowserAgent package (safe to re-run)
+pip install --upgrade .
 
 # Alternative: If pip install fails, dependencies can be installed separately
-pip install playwright>=1.47.0 typer>=0.12.0 rich>=13.0.0
+pip install --upgrade playwright>=1.47.0 typer>=0.12.0 rich>=13.0.0
 
 # Install development dependencies (optional, for testing)
-pip install pytest>=8.0.0 pytest-cov>=5.0.0
+pip install --upgrade pytest>=8.0.0 pytest-cov>=5.0.0
 ```
+
+**Note**: Using `--upgrade` ensures you get the latest versions. If packages are already installed and up-to-date, pip will show "Requirement already satisfied".
 
 ### 5. Install Playwright Browser
 
 ```bash
-# Install Chromium browser for Playwright
+# Install Chromium browser for Playwright (safe to re-run)
 python3 -m playwright install chromium
 
 # This downloads ~300MB and installs to ~/.cache/ms-playwright/
 ```
+
+**Note**: If Chromium is already installed, this command will show "chromium vXXX is already installed" and complete immediately.
 
 **Troubleshooting**: If `playwright` command is not found, use `python3 -m playwright` instead.
 
@@ -129,8 +144,8 @@ python3 -m playwright --version
 # Expected: Version 1.57.0 or higher
 
 # Test 3: Check Chromium browser
-ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome
-# Expected: Should list the Chromium executable
+find ~/.cache/ms-playwright -name chrome -type f | head -1
+# Expected: Should list the Chromium executable path
 ```
 
 ### Method 3: Test Browser Server
@@ -193,6 +208,21 @@ PYTHONPATH=/root/BrowserAgent/src:$PYTHONPATH python3 queue_workflow_simple.py \
 **Note**: The `queue_workflow_simple.py` script includes critical 0.5-second timing delays at 6 points for reliable execution.
 
 ## Common Issues and Solutions
+
+### Issue 0: Repository already exists (git clone fails)
+
+**Cause**: BrowserAgent directory already exists from a previous installation.
+
+**Solution**:
+```bash
+# Update existing installation instead of cloning
+cd /root/BrowserAgent
+git fetch origin
+git checkout main
+git pull origin main
+
+# Then proceed with dependency installation steps
+```
 
 ### Issue 1: ModuleNotFoundError: No module named 'browser_agent'
 
@@ -280,11 +310,22 @@ WebUI (Local) ──SSH──> Cloud Instance (BrowserAgent)
 
 3. **Deployment Automation**
    ```python
-   # Clone repository
-   run_remote_command(ssh, "git clone https://github.com/unearth4334/BrowserAgent.git /root/BrowserAgent")
+   # Check if repository exists, clone or update accordingly
+   check_cmd = "[ -d /root/BrowserAgent ] && echo 'EXISTS' || echo 'NEW'"
+   output, _ = run_remote_command(ssh, check_cmd)
    
-   # Install dependencies
-   run_remote_command(ssh, "cd /root/BrowserAgent && pip install .")
+   if 'EXISTS' in output:
+       # Update existing installation
+       run_remote_command(ssh, 
+           "cd /root/BrowserAgent && git fetch origin && git checkout main && git pull origin main")
+   else:
+       # Clone new installation
+       run_remote_command(ssh, 
+           "git clone https://github.com/unearth4334/BrowserAgent.git /root/BrowserAgent && "
+           "cd /root/BrowserAgent && git checkout main")
+   
+   # Install/upgrade dependencies (safe to re-run)
+   run_remote_command(ssh, "cd /root/BrowserAgent && pip install --upgrade .")
    run_remote_command(ssh, "python3 -m playwright install chromium")
    
    # Verify installation
