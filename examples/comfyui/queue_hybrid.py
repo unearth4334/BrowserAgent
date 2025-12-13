@@ -122,14 +122,17 @@ def load_and_export_workflow(
     print("   📤 Exporting as API format...")
     
     result = client.eval_js("""
-    () => {
+    async () => {
         const app = window.app;
         if (!app || !app.graph) return {error: 'No graph'};
         
-        // Serialize the current graph in API format
-        const apiWorkflow = app.graph.serialize();
-        
-        return {api_format: apiWorkflow};
+        // Use ComfyUI's graphToPrompt method which converts to API format
+        try {
+            const prompt = await app.graphToPrompt();
+            return {api_format: prompt.workflow};
+        } catch (e) {
+            return {error: 'graphToPrompt failed: ' + e.message};
+        }
     }
     """)
     
