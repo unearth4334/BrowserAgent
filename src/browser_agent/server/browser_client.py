@@ -140,6 +140,13 @@ class BrowserClient:
     def get_log_file(self) -> dict:
         """Get the path to the server's log file."""
         return self.send_command({"action": "get_log_file"})
+    
+    def screenshot(self, path: str) -> dict:
+        """Take a screenshot of the current page."""
+        return self.send_command({
+            "action": "screenshot",
+            "path": path
+        })
 
 
 def main():

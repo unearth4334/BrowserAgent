@@ -42,9 +42,9 @@ browser_client: Optional[BrowserClient] = None
 
 class Credentials(BaseModel):
     """Authentication credentials for vast.ai instance."""
-    username: str = Field(..., description="HTTP basic auth username")
-    password: str = Field(..., description="HTTP basic auth password")
-    url: str = Field(..., description="ComfyUI instance URL (e.g., https://example.trycloudflare.com)")
+    username: Optional[str] = Field(None, description="HTTP basic auth username (optional for localhost)")
+    password: Optional[str] = Field(None, description="HTTP basic auth password (optional for localhost)")
+    url: str = Field(..., description="ComfyUI instance URL (e.g., https://example.trycloudflare.com or http://localhost:8188)")
     workflow_path: Optional[str] = Field(None, description="ComfyUI workflow path to auto-open (e.g., 'workflows/my_workflow.json')")
 
 
@@ -117,17 +117,25 @@ async def start_session(request: StartSessionRequest, background_tasks: Backgrou
         )
     
     try:
-        # Build authenticated URL
-        username = request.credentials.username
-        password = request.credentials.password
+        # Build URL with optional authentication
         base_url = request.credentials.url.strip()
         
-        # Remove protocol if present to rebuild with auth
-        if "://" in base_url:
-            protocol, rest = base_url.split("://", 1)
-            auth_url = f"{protocol}://{username}:{password}@{rest}"
+        # Add authentication only if username and password are provided
+        if request.credentials.username and request.credentials.password:
+            username = request.credentials.username
+            password = request.credentials.password
+            
+            # Remove protocol if present to rebuild with auth
+            if "://" in base_url:
+                protocol, rest = base_url.split("://", 1)
+                auth_url = f"{protocol}://{username}:{password}@{rest}"
+            else:
+                auth_url = f"https://{username}:{password}@{base_url}"
         else:
-            auth_url = f"https://{username}:{password}@{base_url}"
+            # No authentication needed (e.g., localhost)
+            auth_url = base_url
+            if not base_url.startswith(("http://", "https://")):
+                auth_url = f"http://{base_url}"
         
         # Start browser server
         browser_server = BrowserServer(
@@ -154,9 +162,14 @@ async def start_session(request: StartSessionRequest, background_tasks: Backgrou
         if ping_result.get("status") != "success":
             raise Exception("Server started but not responding to ping")
         
+        # Mask credentials in response if they exist
+        display_url = auth_url
+        if request.credentials.username and request.credentials.password:
+            display_url = auth_url.replace(f"{request.credentials.username}:{request.credentials.password}@", "***:***@")
+        
         details = {
             "port": request.port,
-            "url": auth_url.replace(f"{username}:{password}@", "***:***@"),  # Mask credentials
+            "url": display_url,
             "headless": request.headless
         }
         

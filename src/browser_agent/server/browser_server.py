@@ -554,6 +554,25 @@ class BrowserServer:
             elif action == "get_log_file":
                 return {"status": "success", "log_file": self.log_file}
             
+            elif action == "screenshot":
+                # Take a screenshot of the current page
+                screenshot_path = command.get("path")
+                if not screenshot_path:
+                    return {"status": "error", "message": "No path provided for screenshot"}
+                
+                if self.controller._page:
+                    try:
+                        self.controller._page.screenshot(path=screenshot_path)
+                        return {
+                            "status": "success",
+                            "path": screenshot_path,
+                            "message": f"Screenshot saved to {screenshot_path}"
+                        }
+                    except Exception as e:
+                        return {"status": "error", "message": f"Screenshot failed: {str(e)}"}
+                else:
+                    return {"status": "error", "message": "No page available"}
+            
             else:
                 return {"status": "error", "message": f"Unknown action: {action}"}
                 
