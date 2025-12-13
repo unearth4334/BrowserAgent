@@ -93,10 +93,10 @@ def queue_workflow_javascript(
     with open(workflow_file_path, 'r') as f:
         workflow_data = json.load(f)
     
-    # Convert to JSON string for JavaScript (with proper escaping)
+    # Use base64 encoding to avoid any escaping issues
+    import base64
     workflow_json = json.dumps(workflow_data)
-    # Escape for embedding in JavaScript string
-    workflow_json_escaped = workflow_json.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+    workflow_b64 = base64.b64encode(workflow_json.encode('utf-8')).decode('utf-8')
     
     print(f"   ✅ Loaded workflow with {len(workflow_data.get('nodes', []))} nodes")
     
@@ -112,8 +112,10 @@ def queue_workflow_javascript(
             return {{error: 'ComfyUI app instance not found'}};
         }}
         
-        // Load the workflow data (parse from JSON string to avoid escaping issues)
-        const workflowData = JSON.parse(`{workflow_json_escaped}`);
+        // Decode base64 workflow data
+        const workflowB64 = '{workflow_b64}';
+        const workflowJson = atob(workflowB64);
+        const workflowData = JSON.parse(workflowJson);
         
         try {{
             // Use ComfyUI's loadGraphData method
