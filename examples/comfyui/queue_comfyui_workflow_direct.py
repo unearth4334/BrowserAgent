@@ -103,7 +103,7 @@ def queue_workflow_javascript(
     # Inject workflow into ComfyUI
     print("\n⚡ Injecting workflow into ComfyUI...")
     
-    result = client.eval_js(f"""
+    js_code = f"""
     async () => {{
         // Get the ComfyUI app instance
         const app = window.app || window.comfyAPI?.app;
@@ -132,7 +132,12 @@ def queue_workflow_javascript(
             return {{error: 'Load failed: ' + e.message}};
         }}
     }}
-    """)
+    """
+    
+    print(f"   JavaScript code length: {len(js_code)} characters")
+    print(f"   Base64 data length: {len(workflow_b64)} characters")
+    
+    result = client.eval_js(js_code)
     
     if result.get("status") != "success":
         print(f"   ❌ JavaScript execution failed: {result}")
