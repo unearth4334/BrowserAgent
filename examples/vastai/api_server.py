@@ -45,6 +45,7 @@ class Credentials(BaseModel):
     username: str = Field(..., description="HTTP basic auth username")
     password: str = Field(..., description="HTTP basic auth password")
     url: str = Field(..., description="ComfyUI instance URL (e.g., https://example.trycloudflare.com)")
+    workflow_path: Optional[str] = Field(None, description="ComfyUI workflow path to auto-open (e.g., 'workflows/my_workflow.json')")
 
 
 class StartSessionRequest(BaseModel):
@@ -52,6 +53,7 @@ class StartSessionRequest(BaseModel):
     credentials: Credentials
     port: int = Field(9999, description="Port for browser server")
     headless: bool = Field(True, description="Run browser in headless mode")
+    auto_open_workflow: bool = Field(True, description="Automatically open workflow if workflow_path is provided in credentials")
 
 
 class OpenWorkflowRequest(BaseModel):
@@ -152,14 +154,32 @@ async def start_session(request: StartSessionRequest, background_tasks: Backgrou
         if ping_result.get("status") != "success":
             raise Exception("Server started but not responding to ping")
         
+        details = {
+            "port": request.port,
+            "url": auth_url.replace(f"{username}:{password}@", "***:***@"),  # Mask credentials
+            "headless": request.headless
+        }
+        
+        # Auto-open workflow if provided
+        workflow_opened = False
+        if request.auto_open_workflow and request.credentials.workflow_path:
+            import time
+            time.sleep(1)  # Extra moment for page to stabilize
+            try:
+                workflow_opened = open_workflow(browser_client, request.credentials.workflow_path)
+                details["workflow_path"] = request.credentials.workflow_path
+                details["workflow_opened"] = workflow_opened
+            except Exception as e:
+                details["workflow_error"] = str(e)
+        
+        message = f"Browser session started on port {request.port}"
+        if workflow_opened:
+            message += f" and opened workflow: {request.credentials.workflow_path}"
+        
         return OperationResponse(
             success=True,
-            message=f"Browser session started on port {request.port}",
-            details={
-                "port": request.port,
-                "url": auth_url.replace(f"{username}:{password}@", "***:***@"),  # Mask credentials
-                "headless": request.headless
-            }
+            message=message,
+            details=details
         )
         
     except Exception as e:

@@ -84,19 +84,24 @@ def test_api(base_url: str = "http://localhost:8000"):
     return True
 
 
-def test_with_credentials(base_url: str, username: str, password: str, url: str):
+def test_with_credentials(base_url: str, username: str, password: str, url: str, workflow_path: str = None):
     """Test API with actual credentials (requires vast.ai instance)."""
     print(f"🧪 Testing VastAI API with credentials at {base_url}\n")
     
     # Start session
     print("1. Starting authenticated session...")
     try:
+        credentials = {
+            "username": username,
+            "password": password,
+            "url": url
+        }
+        if workflow_path:
+            credentials["workflow_path"] = workflow_path
+            print(f"   Including workflow path: {workflow_path}")
+        
         response = requests.post(f"{base_url}/session/start", json={
-            "credentials": {
-                "username": username,
-                "password": password,
-                "url": url
-            },
+            "credentials": credentials,
             "headless": True,
             "port": 9999
         })
@@ -104,7 +109,11 @@ def test_with_credentials(base_url: str, username: str, password: str, url: str)
         data = response.json()
         if data['success']:
             print(f"   ✅ {data['message']}")
-            print(f"      Details: {data['details']}")
+            details = data.get('details', {})
+            print(f"      Port: {details.get('port')}")
+            print(f"      Headless: {details.get('headless')}")
+            if details.get('workflow_opened'):
+                print(f"      Workflow opened: {details.get('workflow_path')}")
         else:
             print(f"   ❌ Failed: {data['message']}")
             return False
@@ -150,10 +159,10 @@ def test_with_credentials(base_url: str, username: str, password: str, url: str)
     return True
 
 
-def load_credentials(credentials_file: Path) -> tuple[str, str, str]:
+def load_credentials(credentials_file: Path) -> tuple[str, str, str, str]:
     """Load credentials from file."""
     if not credentials_file.exists():
-        return None, None, None
+        return None, None, None, None
     
     content = credentials_file.read_text().strip()
     non_comment_lines = []
@@ -162,7 +171,7 @@ def load_credentials(credentials_file: Path) -> tuple[str, str, str]:
         if line and not line.startswith("#"):
             non_comment_lines.append(line)
     
-    username = password = url = None
+    username = password = url = workflow_path = None
     
     if len(non_comment_lines) >= 1 and ":" in non_comment_lines[0]:
         username, password = non_comment_lines[0].split(":", 1)
@@ -172,7 +181,10 @@ def load_credentials(credentials_file: Path) -> tuple[str, str, str]:
     if len(non_comment_lines) >= 2:
         url = non_comment_lines[1].strip()
     
-    return username, password, url
+    if len(non_comment_lines) >= 3:
+        workflow_path = non_comment_lines[2].strip()
+    
+    return username, password, url, workflow_path
 
 
 def main():
@@ -209,14 +221,14 @@ def main():
     # Test with credentials if requested
     if args.with_credentials:
         credentials_path = Path(__file__).parent.parent.parent / args.credentials_file
-        username, password, url = load_credentials(credentials_path)
+        username, password, url, workflow_path = load_credentials(credentials_path)
         
         if not all([username, password, url]):
             print(f"\n⚠️  Could not load credentials from {credentials_path}")
             print("   Skipping credential tests")
         else:
             print(f"\n{'='*60}\n")
-            success = test_with_credentials(args.url, username, password, url)
+            success = test_with_credentials(args.url, username, password, url, workflow_path)
             if not success:
                 return 1
     

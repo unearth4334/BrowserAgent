@@ -203,7 +203,8 @@ curl -X POST http://localhost:8000/session/start \
     "credentials": {
       "username": "myuser",
       "password": "mypass",
-      "url": "https://your-instance.trycloudflare.com"
+      "url": "https://your-instance.trycloudflare.com",
+      "workflow_path": "workflows/my_workflow.json"
     },
     "port": 9999,
     "headless": true
@@ -214,11 +215,13 @@ Response:
 ```json
 {
   "success": true,
-  "message": "Browser session started on port 9999",
+  "message": "Browser session started on port 9999 and opened workflow: workflows/my_workflow.json",
   "details": {
     "port": 9999,
     "url": "https://***:***@your-instance.trycloudflare.com",
-    "headless": true
+    "headless": true,
+    "workflow_path": "workflows/my_workflow.json",
+    "workflow_opened": true
   }
 }
 ```
@@ -307,29 +310,25 @@ Response:
 # 1. Start API server
 python examples/vastai/api_server.py &
 
-# 2. Start authenticated session
+# 2. Start authenticated session (with workflow auto-open)
 curl -X POST http://localhost:8000/session/start \
   -H "Content-Type: application/json" \
   -d '{
     "credentials": {
       "username": "myuser",
       "password": "mypass",
-      "url": "https://your-instance.trycloudflare.com"
+      "url": "https://your-instance.trycloudflare.com",
+      "workflow_path": "workflows/my_workflow.json"
     },
     "headless": true
   }'
 
-# 3. Open workflow
-curl -X POST http://localhost:8000/workflow/open \
-  -H "Content-Type: application/json" \
-  -d '{"workflow_path": "workflows/my_workflow.json"}'
-
-# 4. Queue 10 executions
+# 3. Queue 10 executions (workflow already opened in step 2)
 curl -X POST http://localhost:8000/workflow/queue \
   -H "Content-Type: application/json" \
   -d '{"iterations": 10}'
 
-# 5. Stop session when done
+# 4. Stop session when done
 curl -X POST http://localhost:8000/session/stop
 ```
 
@@ -340,24 +339,19 @@ import requests
 
 API_URL = "http://localhost:8000"
 
-# Start session
+# Start session with workflow auto-open
 response = requests.post(f"{API_URL}/session/start", json={
     "credentials": {
         "username": "myuser",
         "password": "mypass",
-        "url": "https://your-instance.trycloudflare.com"
+        "url": "https://your-instance.trycloudflare.com",
+        "workflow_path": "workflows/my_workflow.json"
     },
     "headless": True
 })
 print(response.json())
 
-# Open workflow
-response = requests.post(f"{API_URL}/workflow/open", json={
-    "workflow_path": "workflows/my_workflow.json"
-})
-print(response.json())
-
-# Queue executions
+# Queue executions (workflow already opened)
 response = requests.post(f"{API_URL}/workflow/queue", json={
     "iterations": 5
 })

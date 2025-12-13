@@ -57,24 +57,17 @@ curl -X POST http://localhost:8000/session/start \
     "credentials": {
       "username": "YOUR_USERNAME",
       "password": "YOUR_PASSWORD",
-      "url": "https://your-instance.trycloudflare.com"
+      "url": "https://your-instance.trycloudflare.com",
+      "workflow_path": "workflows/my_workflow.json"
     },
     "port": 9999,
     "headless": true
   }'
 ```
 
-### 2. Open Workflow
+### 2. Queue Executions
 
-```bash
-curl -X POST http://localhost:8000/workflow/open \
-  -H "Content-Type: application/json" \
-  -d '{
-    "workflow_path": "workflows/my_workflow.json"
-  }'
-```
-
-### 3. Queue Executions
+Note: If you provided `workflow_path` in step 1, the workflow is already opened automatically. Otherwise, use the `/workflow/open` endpoint first.
 
 ```bash
 curl -X POST http://localhost:8000/workflow/queue \
@@ -84,13 +77,13 @@ curl -X POST http://localhost:8000/workflow/queue \
   }'
 ```
 
-### 4. Check Status
+### 3. Check Status
 
 ```bash
 curl http://localhost:8000/session/status
 ```
 
-### 5. Stop Session
+### 4. Stop Session
 
 ```bash
 curl -X POST http://localhost:8000/session/stop
@@ -107,31 +100,27 @@ API_URL = "http://localhost:8000"
 def run_workflow(username, password, url, workflow_path, iterations):
     """Run a ComfyUI workflow on vast.ai."""
     
-    # 1. Start authenticated session
-    print("Starting session...")
+    # 1. Start authenticated session with workflow auto-open
+    print("Starting session and opening workflow...")
     response = requests.post(f"{API_URL}/session/start", json={
         "credentials": {
             "username": username,
             "password": password,
-            "url": url
+            "url": url,
+            "workflow_path": workflow_path
         },
         "headless": True
     })
     response.raise_for_status()
-    print(f"Session started: {response.json()['message']}")
+    result = response.json()
+    print(f"Session started: {result['message']}")
+    if result.get('details', {}).get('workflow_opened'):
+        print(f"  Workflow opened: {workflow_path}")
     
-    # Wait for browser to initialize
-    time.sleep(3)
+    # Wait for browser to stabilize
+    time.sleep(2)
     
-    # 2. Open workflow
-    print(f"Opening workflow: {workflow_path}")
-    response = requests.post(f"{API_URL}/workflow/open", json={
-        "workflow_path": workflow_path
-    })
-    response.raise_for_status()
-    print(f"Workflow opened: {response.json()['message']}")
-    
-    # 3. Queue executions
+    # 2. Queue executions
     print(f"Queueing {iterations} executions...")
     response = requests.post(f"{API_URL}/workflow/queue", json={
         "iterations": iterations
@@ -139,7 +128,7 @@ def run_workflow(username, password, url, workflow_path, iterations):
     response.raise_for_status()
     print(f"Queued: {response.json()['message']}")
     
-    # 4. Stop session
+    # 3. Stop session
     print("Stopping session...")
     response = requests.post(f"{API_URL}/session/stop")
     response.raise_for_status()
