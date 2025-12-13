@@ -56,7 +56,12 @@ def main():
     print("📍 Step 2: Read workflow file...")
     with open(workflow_path, 'r') as f:
         ui_workflow = json.load(f)
-    print(f"   ✅ Read UI workflow ({len(ui_workflow.get('nodes', []))} nodes)\n")
+    print(f"   ✅ Read UI workflow ({len(ui_workflow.get('nodes', []))} nodes)")
+    
+    screenshot_path = str(screenshot_dir / "step2_file_read.png")
+    client.screenshot(screenshot_path)
+    print(f"   📸 Screenshot: {screenshot_path}")
+    print()
     
     # Store in localStorage (chunked)
     print("📍 Step 3: Store workflow in browser localStorage...")
@@ -78,7 +83,12 @@ def main():
             print(f"   ❌ Failed to store chunk {i}")
             return 1
     
-    print("   ✅ Stored all chunks\n")
+    print("   ✅ Stored all chunks")
+    
+    screenshot_path = str(screenshot_dir / "step3_localStorage_stored.png")
+    client.screenshot(screenshot_path)
+    print(f"   📸 Screenshot: {screenshot_path}")
+    print()
     
     # Load workflow
     print("📍 Step 4: Load workflow into ComfyUI...")
