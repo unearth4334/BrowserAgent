@@ -1,7 +1,7 @@
-from unittest.mock import Mock, MagicMock, patch
-from browser_agent.cli import simple_search, patreon_collection, interactive
+from unittest.mock import MagicMock, patch
+from browser_agent.cli import simple_search, interactive
 from browser_agent.agent.core import TaskResult
-from browser_agent.browser.observation import PageObservation, ButtonInfo, InputInfo
+from browser_agent.browser.observation import PageObservation
 import pytest
 
 
@@ -169,120 +169,6 @@ def test_simple_search_function_with_observation_output():
             assert "Results Page" in call_args_str
 
 
-def test_patreon_collection_function_success():
-    """Test patreon collection extraction success."""
-    with patch('browser_agent.cli.PlaywrightBrowserController') as MockController, \
-         patch('browser_agent.cli.Agent') as MockAgent, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env, \
-         patch('browser_agent.cli.print') as mock_print:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = None
-        mock_env_settings.headless = True
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_controller = MagicMock()
-        mock_controller.get_extracted_links.return_value = [
-            "https://www.patreon.com/posts/post1",
-            "https://www.patreon.com/posts/post2",
-        ]
-        MockController.return_value = mock_controller
-        
-        mock_agent = MagicMock()
-        MockAgent.return_value = mock_agent
-        
-        mock_obs = PageObservation(
-            url="https://www.patreon.com/collection/1611241",
-            title="Collection",
-            buttons=[],
-            inputs=[]
-        )
-        mock_result = TaskResult(
-            success=True,
-            reason="Links extracted",
-            final_observation=mock_obs
-        )
-        mock_agent.run_task.return_value = mock_result
-        
-        patreon_collection(collection_id="1611241", headless=True, browser_exe=None)
-        
-        mock_controller.stop.assert_called_once()
-        mock_controller.get_extracted_links.assert_called()
-
-
-def test_patreon_collection_function_with_fallback():
-    """Test patreon collection with fallback link extraction."""
-    with patch('browser_agent.cli.PlaywrightBrowserController') as MockController, \
-         patch('browser_agent.cli.Agent') as MockAgent, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env, \
-         patch('browser_agent.cli.print') as mock_print:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = None
-        mock_env_settings.headless = True
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_controller = MagicMock()
-        # First call returns empty, second returns fallback links
-        mock_controller.get_extracted_links.side_effect = [
-            [],  # Initial extraction
-            ["https://www.patreon.com/posts/fallback1"],  # Fallback extraction
-        ]
-        MockController.return_value = mock_controller
-        
-        mock_agent = MagicMock()
-        MockAgent.return_value = mock_agent
-        
-        mock_obs = PageObservation(
-            url="https://www.patreon.com/collection/1611241",
-            title="Collection",
-            buttons=[],
-            inputs=[]
-        )
-        mock_result = TaskResult(
-            success=True,
-            reason="Task completed",
-            final_observation=mock_obs
-        )
-        mock_agent.run_task.return_value = mock_result
-        
-        patreon_collection(collection_id="1611241", headless=True, browser_exe=None)
-        
-        # Should have tried fallback extraction
-        assert mock_controller.perform.called
-        mock_controller.stop.assert_called_once()
-
-
-def test_patreon_collection_function_failure():
-    """Test patreon collection extraction failure."""
-    with patch('browser_agent.cli.PlaywrightBrowserController') as MockController, \
-         patch('browser_agent.cli.Agent') as MockAgent, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env, \
-         patch('browser_agent.cli.print') as mock_print:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = None
-        mock_env_settings.headless = True
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_controller = MagicMock()
-        MockController.return_value = mock_controller
-        
-        mock_agent = MagicMock()
-        MockAgent.return_value = mock_agent
-        
-        mock_result = TaskResult(
-            success=False,
-            reason="Authentication timeout",
-            final_observation=None
-        )
-        mock_agent.run_task.return_value = mock_result
-        
-        patreon_collection(collection_id="1611241", headless=True, browser_exe=None)
-        
-        mock_controller.stop.assert_called_once()
-
-
 def test_interactive_function_with_url():
     """Test interactive mode with initial URL."""
     with patch('browser_agent.cli.PlaywrightBrowserController') as MockController, \
@@ -332,83 +218,41 @@ def test_interactive_function_without_url():
         mock_session.start.assert_called_once()
 
 
-def test_patreon_collection_with_many_fallback_links():
-    """Test patreon collection with many fallback links (>20)."""
-    with patch('browser_agent.cli.PlaywrightBrowserController') as MockController, \
-         patch('browser_agent.cli.Agent') as MockAgent, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env, \
-         patch('browser_agent.cli.print') as mock_print:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = None
-        mock_env_settings.headless = True
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_controller = MagicMock()
-        # Generate 25 fallback links
-        fallback_links = [f"https://www.patreon.com/posts/link{i}" for i in range(25)]
-        mock_controller.get_extracted_links.side_effect = [
-            [],  # Initial extraction
-            fallback_links,  # Fallback extraction
-        ]
-        MockController.return_value = mock_controller
-        
-        mock_agent = MagicMock()
-        MockAgent.return_value = mock_agent
-        
-        mock_obs = PageObservation(
-            url="https://www.patreon.com/collection/1611241",
-            title="Collection",
-            buttons=[],
-            inputs=[]
-        )
-        mock_result = TaskResult(
-            success=True,
-            reason="Task completed",
-            final_observation=mock_obs
-        )
-        mock_agent.run_task.return_value = mock_result
-        
-        patreon_collection(collection_id="1611241", headless=True, browser_exe=None)
-        
-        # Should show message about "... and X more"
-        mock_controller.stop.assert_called_once()
-
-
-def test_patreon_collection_no_fallback_links():
-    """Test patreon collection when even fallback extraction finds nothing."""
-    with patch('browser_agent.cli.PlaywrightBrowserController') as MockController, \
-         patch('browser_agent.cli.Agent') as MockAgent, \
-         patch('browser_agent.cli.Settings.from_env') as mock_from_env, \
-         patch('browser_agent.cli.print') as mock_print:
-        
-        mock_env_settings = MagicMock()
-        mock_env_settings.browser_executable_path = None
-        mock_env_settings.headless = True
-        mock_from_env.return_value = mock_env_settings
-        
-        mock_controller = MagicMock()
-        # Both extractions return empty
-        mock_controller.get_extracted_links.side_effect = [[], []]
-        MockController.return_value = mock_controller
-        
-        mock_agent = MagicMock()
-        MockAgent.return_value = mock_agent
-        
-        mock_obs = PageObservation(
-            url="https://www.patreon.com/collection/1611241",
-            title="Collection",
-            buttons=[],
-            inputs=[]
-        )
-        mock_result = TaskResult(
-            success=True,
-            reason="Task completed",
-            final_observation=mock_obs
-        )
-        mock_agent.run_task.return_value = mock_result
-        
-        patreon_collection(collection_id="1611241", headless=True, browser_exe=None)
-        
-        # Should show "No post links found at all" message
-        mock_controller.stop.assert_called_once()
+# Server command tests removed - server command no longer in CLI
+# def test_server_command_with_defaults():
+#     """Test server command with default settings."""
+#     with patch('browser_agent.cli.BrowserServer') as MockServer, \
+#          patch('browser_agent.cli.Settings.from_env') as mock_from_env:
+#         
+#         mock_env_settings = MagicMock()
+#         mock_env_settings.browser_executable_path = None
+#         mock_from_env.return_value = mock_env_settings
+#         
+#         mock_server = MagicMock()
+#         MockServer.return_value = mock_server
+#         
+#         from browser_agent.cli import server
+#         server(port=9999, url="https://example.com", no_wait=False, browser_exe=None)
+#         
+#         MockServer.assert_called_once_with(browser_exe=None, port=9999)
+#         mock_server.start.assert_called_once_with(initial_url="https://example.com", wait_for_auth=True)
+# 
+# 
+# def test_server_command_with_browser_exe():
+#     """Test server command with custom browser executable."""
+#     with patch('browser_agent.cli.BrowserServer') as MockServer, \
+#          patch('browser_agent.cli.Settings.from_env') as mock_from_env:
+#         
+#         mock_env_settings = MagicMock()
+#         mock_env_settings.browser_executable_path = "/usr/bin/brave-browser"
+#         mock_from_env.return_value = mock_env_settings
+#         
+#         mock_server = MagicMock()
+#         MockServer.return_value = mock_server
+#         
+#         from browser_agent.cli import server
+#         server(port=8080, url="https://example.com", no_wait=True, browser_exe="/usr/bin/firefox")
+#         
+#         # Should use explicit browser_exe, not env settings
+#         MockServer.assert_called_once_with(browser_exe="/usr/bin/firefox", port=8080)
+#         mock_server.start.assert_called_once_with(initial_url="https://example.com", wait_for_auth=False)

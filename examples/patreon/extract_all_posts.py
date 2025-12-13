@@ -111,7 +111,7 @@ def main():
                 
                 # Check if already processed
                 folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
-                output_dir = Path("outputs") / folder_name
+                output_dir = Path("outputs/patreon") / folder_name
                 
                 if output_dir.exists():
                     html_file = output_dir / f"{post_id}-desc.html"

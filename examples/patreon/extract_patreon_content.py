@@ -17,7 +17,7 @@ from rich import print
 
 def load_collection_data(collection_id: str) -> dict:
     """Load the collection links from the JSON file."""
-    output_dir = Path("outputs")
+    output_dir = Path("outputs/patreon")
     output_file = output_dir / f"patreon_collection_{collection_id}.json"
     
     if not output_file.exists():
@@ -203,7 +203,7 @@ def main():
         
         # Create folder name: POST_<POST_ID>_<POST_NAME>
         folder_name = f"POST_{post_id}_{sanitize_filename(post_name)}"
-        output_dir = Path("outputs") / folder_name
+        output_dir = Path("outputs/patreon") / folder_name
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Save HTML file
