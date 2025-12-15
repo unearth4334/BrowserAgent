@@ -69,6 +69,11 @@ class BrowserServer:
             initial_url: URL to navigate to initially (optional)
             wait_for_auth: Whether to wait for user input before starting server
         """
+        # Check for existing server and offer to terminate
+        if not check_and_terminate_existing_server(self.port):
+            import sys
+            sys.exit(1)
+        
         # Set up file logging
         import logging
         logging.basicConfig(
@@ -580,6 +585,113 @@ class BrowserServer:
             return {"status": "error", "message": str(e)}
 
 
+def check_and_terminate_existing_server(port: int) -> bool:
+    """
+    Check if a server is already running on the given port and offer to terminate it.
+    
+    Args:
+        port: Port number to check
+        
+    Returns:
+        True if we can proceed (no server or terminated successfully), False otherwise
+    """
+    import subprocess
+    import sys
+    from rich import print
+    
+    # Try to find process listening on the port
+    try:
+        result = subprocess.run(
+            ['lsof', '-ti', f':{port}'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            pids = result.stdout.strip().split('\n')
+            
+            # Get process details
+            try:
+                ps_result = subprocess.run(
+                    ['ps', '-p', ','.join(pids), '-o', 'pid,comm,args'],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                
+                print(f"[yellow]⚠️  Found existing process(es) using port {port}:[/yellow]")
+                print(f"[dim]{ps_result.stdout}[/dim]")
+            except:
+                print(f"[yellow]⚠️  Found process(es) using port {port}: {', '.join(pids)}[/yellow]")
+            
+            # Prompt user
+            response = input("\n[?] Terminate existing server(s)? [y/N]: ").strip().lower()
+            
+            if response in ['y', 'yes']:
+                for pid in pids:
+                    try:
+                        subprocess.run(['kill', pid], timeout=5)
+                        print(f"[green]✓ Terminated process {pid}[/green]")
+                    except Exception as e:
+                        print(f"[red]✗ Failed to terminate {pid}: {e}[/red]")
+                        return False
+                
+                # Wait for port to be released
+                import time
+                print("[dim]Waiting for port to be released...[/dim]")
+                for i in range(10):  # Try for up to 5 seconds
+                    time.sleep(0.5)
+                    # Check if port is free
+                    try:
+                        check_result = subprocess.run(
+                            ['lsof', '-ti', f':{port}'],
+                            capture_output=True,
+                            text=True,
+                            timeout=2
+                        )
+                        if check_result.returncode != 0 or not check_result.stdout.strip():
+                            # Port is free
+                            print(f"[green]✓ Port {port} is now available[/green]")
+                            return True
+                    except:
+                        pass
+                
+                # Last attempt - port might be free even if we can't verify
+                print(f"[yellow]Note: Could not verify port status, attempting to proceed...[/yellow]")
+                return True
+            else:
+                print("[yellow]Cancelled. Please terminate the existing server manually or use a different port.[/yellow]")
+                return False
+        
+        # No process found on port
+        return True
+        
+    except FileNotFoundError:
+        # lsof not available, try using netstat or ss
+        try:
+            result = subprocess.run(
+                ['ss', '-tlnp', f'sport = :{port}'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0 and 'LISTEN' in result.stdout:
+                print(f"[yellow]⚠️  Port {port} appears to be in use[/yellow]")
+                print(f"[dim]{result.stdout}[/dim]")
+                print("[yellow]Please terminate the existing server manually or use a different port.[/yellow]")
+                return False
+            
+            return True
+        except:
+            # Can't check, proceed anyway
+            return True
+    except Exception as e:
+        print(f"[dim]Note: Could not check for existing server: {e}[/dim]")
+        return True
+
+
 def main():
     """CLI entry point for the browser server."""
     import sys
@@ -593,6 +705,10 @@ def main():
     parser.add_argument("--log-file", type=str, default=None, help="Log file path (default: /tmp/browser_server_{port}.log)")
     
     args = parser.parse_args()
+    
+    # Check for existing server and offer to terminate
+    if not check_and_terminate_existing_server(args.port):
+        sys.exit(1)
     
     server = BrowserServer(browser_exe=args.browser_exe, port=args.port, log_file=args.log_file)
     server.start(initial_url=args.initial_url, wait_for_auth=args.wait)
