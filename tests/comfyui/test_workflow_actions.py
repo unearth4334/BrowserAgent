@@ -6,7 +6,7 @@ import json
 import sys
 
 # Add fixtures to path
-sys.path.insert(0, str(Path(__file__).parent / "fixtures"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "examples" / "comfyui" / "tests"))
 
 from browser_agent.comfyui.actions.workflow import (
     LoadWorkflowAction,
@@ -30,7 +30,7 @@ def mock_client():
 @pytest.fixture
 def sample_workflow_path():
     """Provide path to sample workflow JSON."""
-    return Path(__file__).parent / "fixtures" / "sample_workflow.json"
+    return Path(__file__).parent.parent.parent / "examples" / "comfyui" / "tests" / "sample_workflow.json"
 
 
 @pytest.fixture
