@@ -15,8 +15,12 @@ from .agent.task_spec import SimpleSearchTaskSpec, ComfyUIWorkflowTaskSpec
 from .agent.policy_comfyui import ComfyUIWorkflowPolicy
 from .agent.workflow_runner import CanvasWorkflowRunner
 from .interactive_session import InteractiveBrowserSession
+from .comfyui.cli import comfyui_app
 
 app = typer.Typer(help="Browser agent CLI")
+
+# Add ComfyUI subcommand
+app.add_typer(comfyui_app, name="comfyui")
 
 
 @app.command()
