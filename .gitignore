@@ -48,3 +48,5 @@ outputs/
 
 # Credentials
 vastai_credentials.txt
+
+examples/forge/checkpoint_list.txt
