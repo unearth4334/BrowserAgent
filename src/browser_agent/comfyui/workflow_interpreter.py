@@ -166,9 +166,9 @@ class WorkflowInterpreter:
                 # LoRAs are handled specially since they come as a list
                 if input_id == "loras" and isinstance(value, list):
                     for lora in value:
-                        action = self._make_add_lora_action(lora, mapping)
-                        if action:
-                            actions.append(action)
+                        lora_actions = self._make_add_lora_action(lora, mapping)
+                        if lora_actions:
+                            actions.extend(lora_actions)
         
         # Handle vector widgets (need both X and Y values)
         actions.extend(self._make_vector_widget_actions(flat_inputs))
@@ -278,8 +278,8 @@ class WorkflowInterpreter:
     
     def _make_add_lora_action(
         self, lora: Dict, mapping: Dict
-    ) -> Optional[AddLoRAPairAction]:
-        """Create an AddLoRAPairAction from LoRA config and mapping."""
+    ) -> Optional[List[AddLoRAPairAction]]:
+        """Create AddLoRAPairAction(s) from LoRA config and mapping."""
         high_node_id = mapping.get("high_node_id")
         low_node_id = mapping.get("low_node_id")
         
@@ -287,18 +287,50 @@ class WorkflowInterpreter:
             logger.warning("Missing high_node_id or low_node_id in LoRA mapping")
             return None
         
-        lora_path = lora.get("path", "")
+        # Support both old 'path' format and new 'high_noise'/'low_noise' format
+        high_noise = lora.get("high_noise")
+        low_noise = lora.get("low_noise")
         strength = lora.get("strength", 1.0)
         enabled = lora.get("enabled", True)
         
-        logger.debug(f"Add LoRA: {lora_path} (strength={strength}) -> nodes {high_node_id}/{low_node_id}")
-        return AddLoRAPairAction(
-            high_node_id=high_node_id,
-            low_node_id=low_node_id,
-            lora_path=lora_path,
-            strength=strength,
-            enabled=enabled
-        )
+        actions = []
+        
+        # High noise LoRA
+        if high_noise:
+            logger.debug(f"Add LoRA (high): {high_noise} (strength={strength}) -> node {high_node_id}")
+            actions.append(AddLoRAPairAction(
+                high_node_id=high_node_id,
+                low_node_id=low_node_id,
+                lora_path=high_noise,
+                strength=strength,
+                enabled=enabled
+            ))
+        
+        # Low noise LoRA
+        if low_noise:
+            logger.debug(f"Add LoRA (low): {low_noise} (strength={strength}) -> node {low_node_id}")
+            actions.append(AddLoRAPairAction(
+                high_node_id=high_node_id,
+                low_node_id=low_node_id,
+                lora_path=low_noise,
+                strength=strength,
+                enabled=enabled
+            ))
+        
+        # Fallback to old 'path' format if neither high_noise nor low_noise specified
+        if not high_noise and not low_noise:
+            lora_path = lora.get("path", "")
+            if lora_path:
+                logger.debug(f"Add LoRA: {lora_path} (strength={strength}) -> nodes {high_node_id}/{low_node_id}")
+                actions.append(AddLoRAPairAction(
+                    high_node_id=high_node_id,
+                    low_node_id=low_node_id,
+                    lora_path=lora_path,
+                    strength=strength,
+                    enabled=enabled
+                ))
+        
+        return actions if actions else None
     
     def apply_actions(
         self, 
@@ -384,34 +416,45 @@ class WorkflowInterpreter:
         action: AddLoRAPairAction
     ):
         """Apply an AddLoRAPairAction to the workflow."""
-        # Power Lora Loader nodes store LoRAs in widgets_values as a complex structure
-        for node_id in [action.high_node_id, action.low_node_id]:
-            node = nodes_by_id.get(node_id)
-            if not node:
-                logger.warning(f"Node {node_id} not found")
-                continue
-            
-            widgets_values = node.get("widgets_values", [])
-            
-            # Find the LoRA list in widgets_values (usually at index 2)
-            lora_list = None
-            for widget in widgets_values:
-                if isinstance(widget, dict) and "loras" in widget:
-                    lora_list = widget["loras"]
-                    break
-            
-            if lora_list is None:
-                logger.warning(f"No LoRA list found in node {node_id}")
-                continue
-            
-            # Add new LoRA entry
-            lora_entry = {
-                "on": action.enabled,
-                "lora": action.lora_path,
-                "strength": action.strength
-            }
-            lora_list.append(lora_entry)
-            logger.debug(f"Added LoRA to node {node_id}: {action.lora_path}")
+        # Determine which node to add to based on the action's lora_path
+        # High noise LoRAs go to high_node_id, low noise to low_node_id
+        # If path contains "high", use high_node_id, if "low", use low_node_id
+        if "high" in action.lora_path.lower():
+            target_node_id = action.high_node_id
+        elif "low" in action.lora_path.lower():
+            target_node_id = action.low_node_id
+        else:
+            # Default to high node if unclear
+            target_node_id = action.high_node_id
+        
+        node = nodes_by_id.get(target_node_id)
+        if not node:
+            logger.warning(f"Node {target_node_id} not found")
+            return
+        
+        widgets_values = node.get("widgets_values", [])
+        
+        # Power Lora Loader structure:
+        # [0] = {}
+        # [1] = {"type": "PowerLoraLoaderHeaderWidget"}
+        # [2...N] = Individual LoRA entries {"on": bool, "lora": str, "strength": num}
+        # [N+1] = {}
+        # [N+2] = ""
+        
+        # Create new LoRA entry
+        lora_entry = {
+            "on": action.enabled,
+            "lora": action.lora_path,
+            "strength": action.strength,
+            "strengthTwo": None
+        }
+        
+        # Insert before the last two elements ({} and "")
+        # Find insertion point (before trailing {} and "")
+        insert_idx = len(widgets_values) - 2 if len(widgets_values) >= 2 else len(widgets_values)
+        widgets_values.insert(insert_idx, lora_entry)
+        
+        logger.debug(f"Added LoRA to node {target_node_id} at index {insert_idx}: {action.lora_path}")
     
     def _apply_modify_vector(
         self, 

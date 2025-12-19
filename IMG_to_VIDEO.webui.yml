@@ -59,9 +59,9 @@ node_mapping:
     action_type: "modify_widget"
     
   vram_reduction:
-    node_id: 429
+    node_id: 502
     node_type: "mxSlider"
-    node_title: "VRAM Reduction"
+    node_title: "Reduce VRAM usage (BlockSwap)"
     widget_indices: [0, 1]
     action_type: "modify_widget"
     
@@ -91,85 +91,88 @@ node_mapping:
     
   # === FEATURE TOGGLES (mode-based) ===
   save_last_frame:
-    node_ids: [423, 389]
+    node_ids: [447]
     node_type: "SaveImage"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
     
   enable_interpolation:
-    node_ids: [363, 370, 432]
-    node_type: "VHS_FILMC_Interpolation"
+    node_ids: [431, 442, 433]
+    node_type: "RIFE VFI + Save"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
     
   use_upscaler:
-    node_ids: [372, 375, 380, 362, 381]
-    node_type: "ImageUpscaleWithModel"
+    node_ids: [385, 437, 419]
+    node_type: "ImageUpscaleWithModel + Save"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
     
   enable_upscale_interpolation:
-    node_ids: [372, 375, 380, 362, 364, 379, 430]
-    node_type: "Mixed (Upscale + Interpolation)"
+    node_ids: [443]
+    node_type: "Save UPINT (combined output)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
+    # Note: This controls the combined upscaled+interpolated output save node only
+    # The processing nodes (385, 431, 437, 442) are controlled by use_upscaler and enable_interpolation
+    # When enabled, produces a third output that is both upscaled AND interpolated
     
   enable_video_enhancer:
-    node_ids: [355, 352]
+    node_ids: [481, 482]
     node_type: "WanVideoEnhanceAVideoKJ"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4  # muted instead of bypassed
     
   enable_cfg_zero_star:
-    node_ids: [351, 353]
-    node_type: "CFGZeroStar"
+    node_ids: [483, 484]
+    node_type: "CFGZeroStarAndInit"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
     
   enable_speed_regulation:
-    node_ids: [348, 349]
+    node_ids: [467, 468]
     node_type: "ModelSamplingSD3"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
     
   enable_normalized_attention:
-    node_ids: [430, 431]
+    node_ids: [485, 486]
     node_type: "WanVideoNAG"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
     
   enable_magcache:
-    node_ids: [438, 437]
+    node_ids: [505, 506]
     node_type: "MagCache"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
     
   enable_block_swap:
-    node_ids: [432, 434, 435]
-    node_type: "BlockSwap"
+    node_ids: [500, 501]
+    node_type: "wanBlockSwap"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
     
   enable_torch_compile:
-    node_ids: [365, 366, 369, 377]
-    node_type: "TorchCompile"
+    node_ids: [492, 494]
+    node_type: "TorchCompileModelWanVideo"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
     
   enable_auto_prompt:
-    node_ids: [357, 360, 361, 368, 371, 373, 374]
-    node_type: "Florence2 Auto Prompting"
+    node_ids: [403]
+    node_type: "Fast Groups Bypasser (rgthree)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 4
