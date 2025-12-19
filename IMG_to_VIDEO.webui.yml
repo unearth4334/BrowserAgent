@@ -1,0 +1,561 @@
+name: "IMG to VIDEO"
+description: "Generate video from a single image using WAN 2.2 Image-to-Video model with high/low noise dual sampling"
+version: "3.0.0"
+category: "video"
+tags:
+  - image-to-video
+  - wan-2.2
+  - video-generation
+  - 14B-model
+
+# Workflow JSON file reference (canvas format)
+workflow_file: "outputs/workflows/WAN2.2_IMG_to_VIDEO_Base_47e91030.json"
+base_hash: "47e91030"  # Original workflow hash for validation
+
+# Node mapping for programmatic workflow modification
+# Maps UI parameters to workflow node modifications
+node_mapping:
+  # === SCALAR PARAMETERS (mxSlider nodes) ===
+  duration:
+    node_id: 426
+    node_type: "mxSlider"
+    node_title: "Duration"
+    widget_indices: [0, 1]  # Both indices set to same value
+    action_type: "modify_widget"
+    
+  steps:
+    node_id: 82
+    node_type: "mxSlider"
+    node_title: "Steps"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  cfg:
+    node_id: 85
+    node_type: "mxSlider"
+    node_title: "CFG"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  frame_rate:
+    node_id: 490
+    node_type: "mxSlider"
+    node_title: "Frame rate"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  speed:
+    node_id: 157
+    node_type: "mxSlider"
+    node_title: "Speed"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  upscale_ratio:
+    node_id: 421
+    node_type: "mxSlider"
+    node_title: "Upscale Ratio"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  vram_reduction:
+    node_id: 429
+    node_type: "mxSlider"
+    node_title: "VRAM Reduction"
+    widget_indices: [0, 1]
+    action_type: "modify_widget"
+    
+  seed:
+    node_id: 73
+    node_type: "RandomNoise"
+    node_title: "Noise"
+    widget_indices: [0]
+    action_type: "modify_widget"
+    
+  # === VECTOR PARAMETERS (mxSlider2D node) ===
+  size_x:
+    node_id: 83
+    node_type: "mxSlider2D"
+    node_title: "Size"
+    widget_indices: [0, 1]  # X dimension
+    action_type: "modify_vector_widget"
+    vector_key: "x"
+    
+  size_y:
+    node_id: 83
+    node_type: "mxSlider2D"
+    node_title: "Size"
+    widget_indices: [2, 3]  # Y dimension
+    action_type: "modify_vector_widget"
+    vector_key: "y"
+    
+  # === FEATURE TOGGLES (mode-based) ===
+  save_last_frame:
+    node_ids: [423, 389]
+    node_type: "SaveImage"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  enable_interpolation:
+    node_ids: [363, 370, 432]
+    node_type: "VHS_FILMC_Interpolation"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  use_upscaler:
+    node_ids: [372, 375, 380, 362, 381]
+    node_type: "ImageUpscaleWithModel"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  enable_upscale_interpolation:
+    node_ids: [372, 375, 380, 362, 364, 379, 430]
+    node_type: "Mixed (Upscale + Interpolation)"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+    
+  enable_video_enhancer:
+    node_ids: [355, 352]
+    node_type: "WanVideoEnhanceAVideoKJ"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4  # muted instead of bypassed
+    
+  enable_cfg_zero_star:
+    node_ids: [351, 353]
+    node_type: "CFGZeroStar"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_speed_regulation:
+    node_ids: [348, 349]
+    node_type: "ModelSamplingSD3"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_normalized_attention:
+    node_ids: [430, 431]
+    node_type: "WanVideoNAG"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_magcache:
+    node_ids: [438, 437]
+    node_type: "MagCache"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_block_swap:
+    node_ids: [432, 434, 435]
+    node_type: "BlockSwap"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_torch_compile:
+    node_ids: [365, 366, 369, 377]
+    node_type: "TorchCompile"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  enable_auto_prompt:
+    node_ids: [357, 360, 361, 368, 371, 373, 374]
+    node_type: "Florence2 Auto Prompting"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 4
+    
+  # === LORA CONFIGURATION ===
+  loras:
+    high_node_id: 416
+    low_node_id: 471
+    node_type: "Power Lora Loader (rgthree)"
+    action_type: "add_lora_pair"
+    max_loras: 5
+
+# Thumbnail/preview image (optional)
+thumbnail: null
+
+# Validation Configuration (Optional - enables template validation)
+validation:
+  strict_mode: false  # If true, validation errors will prevent workflow generation
+  check_node_ids: true  # Verify all node_ids exist in template
+  check_widgets: false  # Validate widget structure (requires metadata)
+  warn_on_mismatch: true  # Warn instead of error on validation failures
+
+# UI Layout Configuration - Section-based layout for organized UI
+layout:
+  sections:
+    - id: "basic"
+      title: "📝 Basic Settings"
+      collapsed: false
+      
+    - id: "generation"
+      title: "⚙️ Generation Parameters"
+      collapsed: false
+      
+    - id: "models"
+      title: "🎯 Model Selection"
+      collapsed: false
+      
+    - id: "features"
+      title: "🔧 Advanced Features"
+      collapsed: true
+
+# Helper Tools (not workflow fields, but UI utilities)
+helper_tools:
+  - id: "auto_sizing"
+    type: "auto_size_calculator"
+    label: "Automatic Sizing"
+    description: "Calculate optimal output dimensions based on input image aspect ratio"
+    position: "header"  # Display below workflow title/description
+    controls:
+      - id: "max_image_size"
+        type: "slider_with_apply"
+        label: "Max Image Size"
+        description: "Limits image size by scaling down if it exceeds the specified megapixels."
+        min: 0.1
+        max: 4.0
+        step: 0.1
+        default: 1.0
+        unit: "MP"
+        apply_button: true
+        apply_button_label: "Apply"
+        apply_button_enabled_when: "value_changed"
+    targets:
+      width_field: "size_x"
+      height_field: "size_y"
+    requires:
+      - "input_image"
+    triggers:
+      - "input_image_upload"
+      - "auto_size_toggle_change"
+      - "max_image_size_apply"
+    behavior:
+      when_enabled:
+        - disable_field: "size_x"
+        - disable_field: "size_y"
+        - calculate_and_update: ["size_x", "size_y"]
+      when_disabled:
+        - enable_field: "size_x"
+        - enable_field: "size_y"
+      calculation_method: "maintain_aspect_ratio_fit_max"
+      snap_to_grid: 64
+
+inputs:
+  # === BASIC SETTINGS ===
+  - id: "input_image"
+    section: "basic"
+    type: "image"
+    label: "Input Image"
+    description: "Source image to animate. Will be resized to fit the selected output size."
+    required: true
+    accept: "image/png,image/jpeg,image/webp"
+    max_size_mb: 10
+
+  - id: "positive_prompt"
+    section: "basic"
+    type: "textarea"
+    label: "Positive Prompt"
+    description: "Describe the motion and style you want in the video"
+    required: true
+    default: "The subject moves naturally with smooth cinematic motion, high quality, detailed"
+    placeholder: "Describe the desired motion and style..."
+    max_length: 2000
+    rows: 4
+
+  - id: "negative_prompt"
+    section: "basic"
+    type: "textarea"
+    label: "Negative Prompt"
+    description: "What to avoid in the generation"
+    required: false
+    default: "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走, fast movements, blurry, mouth moving, talking, teeth visible, strong blush"
+    rows: 3
+
+  - id: "seed"
+    section: "basic"
+    type: "seed"
+    label: "Seed"
+    description: "Random seed for reproducibility (-1 for random)"
+    randomize_button: true
+    default: -1
+    control_after_generate: "randomize"
+
+  # === GENERATION PARAMETERS ===
+  - id: "size_x"
+    section: "generation"
+    type: "slider"
+    label: "Width"
+    description: "Output width in pixels"
+    min: 512
+    max: 1920
+    step: 64
+    default: 896
+    unit: "px"
+    node_mapping: "size_x"  # Links to node_mapping section
+    controlled_by: "auto_size_enabled"
+    auto_calculate: true
+
+  - id: "size_y"
+    section: "generation"
+    type: "slider"
+    label: "Height"
+    description: "Output height in pixels"
+    min: 512
+    max: 1920
+    step: 64
+    default: 1120
+    unit: "px"
+    node_mapping: "size_y"  # Links to node_mapping section
+
+  - id: "duration"
+    section: "generation"
+    type: "slider"
+    label: "Duration"
+    description: "Video length in seconds"
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    default: 5.0
+    unit: "seconds"
+    node_mapping: "duration"  # Links to node_mapping section
+
+  - id: "steps"
+    section: "generation"
+    type: "slider"
+    label: "Steps"
+    description: "Denoising steps. Higher = better quality but slower."
+    min: 10
+    max: 40
+    step: 1
+    default: 20
+    node_mapping: "steps"  # Links to node_mapping section
+
+  - id: "cfg"
+    section: "generation"
+    type: "slider"
+    label: "CFG Scale"
+    description: "Prompt adherence strength. Higher = more prompt influence."
+    min: 1.0
+    max: 10.0
+    step: 0.5
+    default: 3.5
+    node_mapping: "cfg"  # Links to node_mapping section
+
+  - id: "frame_rate"
+    section: "generation"
+    type: "slider"
+    label: "Frame Rate"
+    description: "Output frames per second"
+    min: 8.0
+    max: 24.0
+    step: 1.0
+    default: 16.0
+    unit: "FPS"
+    node_mapping: "frame_rate"  # Links to node_mapping section
+
+  - id: "speed"
+    section: "generation"
+    type: "slider"
+    label: "Sampling Speed"
+    description: "ModelSamplingSD3 shift parameter"
+    min: 1.0
+    max: 15.0
+    step: 0.5
+    default: 7.0
+    node_mapping: "speed"  # Links to node_mapping section
+
+  - id: "upscale_ratio"
+    section: "generation"
+    type: "slider"
+    label: "Upscale Ratio"
+    description: "Scale factor for upscaling"
+    min: 1.0
+    max: 4.0
+    step: 0.5
+    default: 2.0
+    node_mapping: "upscale_ratio"  # Links to node_mapping section
+
+  # === MODEL SELECTION ===
+  - id: "main_model"
+    section: "models"
+    type: "high_low_pair_model"
+    label: "Main Model (High/Low Noise Pair)"
+    description: "Diffusion model pair for generation. Click refresh to scan instance for available models."
+    required: true
+    model_type: "diffusion_models"
+    default_high: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors"
+    default_low: "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
+
+  - id: "loras"
+    section: "models"
+    type: "high_low_pair_lora_list"
+    label: "LoRAs (High/Low Noise Pairs)"
+    description: "Add LoRAs for style/motion control. Each LoRA should have high/low noise variants."
+    required: false
+    model_type: "loras"
+    max_items: 5
+
+  - id: "clip_model"
+    section: "models"
+    type: "single_model"
+    label: "CLIP Model"
+    description: "Text encoder model"
+    required: true
+    model_type: "text_encoders"
+    default: "Wan-2.2/umt5_xxl_fp16.safetensors"
+
+  - id: "vae_model"
+    section: "models"
+    type: "single_model"
+    label: "VAE Model"
+    description: "Variational autoencoder"
+    required: true
+    model_type: "vae"
+    default: "Wan-2.1/wan_2.1_vae.safetensors"
+
+  - id: "upscale_model"
+    section: "models"
+    type: "single_model"
+    label: "Upscale Model"
+    description: "Super-resolution model for upscaling"
+    required: false
+    model_type: "upscale_models"
+    default: "RealESRGAN_x4plus.pth"
+
+  # === ADVANCED FEATURES ===
+  
+  # Output & Enhancement Toggles
+  - id: "save_last_frame"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Save Last Frame"
+    description: "Save the final frame as a separate image output"
+    required: false
+    default: 2  # mode: 2 = disabled (bypass)
+    node_mapping: "save_last_frame"
+
+  - id: "enable_interpolation"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Enable Interpolation (RIFE)"
+    description: "Use RIFE to interpolate frames and increase smoothness"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_interpolation"
+
+  - id: "use_upscaler"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Enable Upscaler"
+    description: "Apply AI upscaling to the input image before video generation. Uses the upscale model and ratio configured above."
+    required: false
+    default: 2  # mode: 2 = disabled (bypass)
+    node_mapping: "use_upscaler"
+
+  - id: "enable_upscale_interpolation"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Enable Upscale + Interpolation"
+    description: "Apply both upscaling and frame interpolation (combines both techniques)"
+    required: false
+    default: 2  # mode: 2 = disabled (bypass)
+    node_mapping: "enable_upscale_interpolation"
+
+  - id: "enable_video_enhancer"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Video Enhancer (WanVideoEnhanceAVideoKJ)"
+    description: "Apply WAN video enhancement for improved quality"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_video_enhancer"
+
+  - id: "enable_cfg_zero_star"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "CFGZeroStar"
+    description: "Enable CFG guidance enhancement for better prompt adherence"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_cfg_zero_star"
+
+  - id: "enable_speed_regulation"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Speed Regulation"
+    description: "Enable ModelSamplingSD3 speed control for sampling adjustments"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_speed_regulation"
+
+  - id: "enable_normalized_attention"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Normalized Attention (WanVideoNAG)"
+    description: "Apply normalized attention guidance for better consistency"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_normalized_attention"
+
+  # Performance & Memory
+  - id: "enable_magcache"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "MagCache"
+    description: "Enable memory caching to speed up repeated operations"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_magcache"
+
+  - id: "enable_torch_compile"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "TorchCompile"
+    description: "Enable JIT compilation for faster execution (first run will be slower)"
+    required: false
+    default: 4  # mode: 4 = muted (disabled)
+    node_mapping: "enable_torch_compile"
+
+  - id: "enable_block_swap"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "BlockSwap"
+    description: "Enable model offloading to reduce VRAM usage at the cost of speed"
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_block_swap"
+
+  # VRAM Control
+  - id: "vram_reduction"
+    section: "features"
+    type: "slider"
+    label: "VRAM Reduction"
+    description: "Percentage of model to offload to system RAM (0% = all in VRAM, 100% = maximum offloading)"
+    min: 0
+    max: 100
+    step: 1
+    default: 100
+    unit: "%"
+    node_mapping: "vram_reduction"
+
+  # Automatic Prompting
+  - id: "enable_auto_prompt"
+    section: "features"
+    type: "node_mode_toggle"
+    label: "Automatic Prompting (Florence2)"
+    description: "Enable Florence2 AI to automatically generate descriptive prompts from the input image. When enabled, generates and enhances prompts automatically."
+    required: false
+    default: 0  # mode: 0 = enabled
+    node_mapping: "enable_auto_prompt"
+

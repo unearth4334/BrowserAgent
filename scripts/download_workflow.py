@@ -6,6 +6,9 @@ import subprocess
 import sys
 from pathlib import Path
 import argparse
+import hashlib
+import base64
+from datetime import datetime
 
 # Remote connection details
 REMOTE_HOST = "198.53.64.194"
@@ -15,13 +18,14 @@ REMOTE_USER = "root"
 # Default file path on remote
 DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/UmeAiRT/WAN2.2_IMG_to_VIDEO_Base.json"
 
-def download_workflow(remote_path: str, local_path: str, verbose: bool = True):
+def download_workflow(remote_path: str, local_path: str, description: str = None, verbose: bool = True):
     """
     Download a workflow JSON file from the remote instance.
     
     Args:
         remote_path: Path to the file on the remote instance
         local_path: Where to save the file locally
+        description: Description for the workflow catalog entry
         verbose: Print progress messages
     """
     if verbose:
@@ -61,15 +65,64 @@ def download_workflow(remote_path: str, local_path: str, verbose: bool = True):
             size_kb = local_file.stat().st_size / 1024
             if verbose:
                 print(f"✓ File size: {size_kb:.2f} KB")
-        
-        return True
-        
+            
+            # Calculate hash and rename file with hash suffix
+            with open(local_file, 'rb') as f:
+                file_hash = hashlib.sha256(f.read()).hexdigest()[:8]
+            
+            # Create new filename with hash
+            stem = local_file.stem
+            suffix = local_file.suffix
+            new_name = f"{stem}_{file_hash}{suffix}"
+            new_path = local_file.parent / new_name
+            
+            # Rename file
+            local_file.rename(new_path)
+            
+            if verbose:
+                print(f"✓ Renamed with hash: {new_path.name}")
+            
+            # Update catalog if in outputs/workflows directory
+            if "outputs/workflows" in str(new_path.parent):
+                update_catalog(new_path, file_hash, description)
+            
+            return str(new_path)
+    
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ Error downloading file: {e}", file=sys.stderr)
-        return False
-    except KeyboardInterrupt:
-        print(f"\n\n⚠️  Download cancelled by user", file=sys.stderr)
-        return False
+        if verbose:
+            print(f"✗ Error downloading file: {e}", file=sys.stderr)
+        return None
+    
+    return local_path
+
+
+def update_catalog(workflow_path: Path, file_hash: str, description: str = None):
+    """Update the workflows catalog README with the new download."""
+    catalog_path = workflow_path.parent / "README.md"
+    
+    if not catalog_path.exists():
+        # Catalog doesn't exist, skip update
+        return
+    
+    # Read current catalog
+    content = catalog_path.read_text()
+    
+    # Get current date
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    
+    # Always append new entry (don't update existing)
+    desc = description if description else ""
+    new_row = f"| {workflow_path.name} | {file_hash} | {desc} | {date_str} |"
+    
+    # Append to end of file
+    if content.strip():
+        content = content.rstrip() + '\n' + new_row + '\n'
+    else:
+        content = new_row + '\n'
+    
+    # Write updated catalog
+    catalog_path.write_text(content)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -77,7 +130,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Examples:
-  # Download default workflow to current directory
+  # Download default workflow to current directory (hash appended automatically)
   {sys.argv[0]}
   
   # Download to specific location
@@ -85,6 +138,8 @@ Examples:
   
   # Download a different workflow
   {sys.argv[0]} -r /workspace/ComfyUI/user/default/workflows/folder/workflow.json
+  
+Note: A hash will be automatically appended to the filename (e.g., workflow_a1b2c3d4e5f6.json)
   
 Connection details:
   Host: {REMOTE_HOST}
@@ -101,8 +156,14 @@ Connection details:
     
     parser.add_argument(
         "-o", "--output",
-        default="WAN2.2_IMG_to_VIDEO_Base.json",
-        help="Local output filename (default: WAN2.2_IMG_to_VIDEO_Base.json)"
+        default="outputs/workflows/WAN2.2_IMG_to_VIDEO_Base.json",
+        help="Local output filename (hash will be appended automatically)"
+    )
+    
+    parser.add_argument(
+        "-d", "--description",
+        default=None,
+        help="Description for the workflow catalog entry"
     )
     
     parser.add_argument(
@@ -114,13 +175,14 @@ Connection details:
     args = parser.parse_args()
     
     # Download the file
-    success = download_workflow(
+    final_path = download_workflow(
         remote_path=args.remote_path,
         local_path=args.output,
+        description=args.description,
         verbose=not args.quiet
     )
     
-    sys.exit(0 if success else 1)
+    sys.exit(0 if final_path else 1)
 
 if __name__ == "__main__":
     main()
