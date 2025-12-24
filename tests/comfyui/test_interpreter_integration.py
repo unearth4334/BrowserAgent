@@ -1,8 +1,11 @@
 """
 Integration tests for workflow interpreter.
 
-Tests all 26 workflow variations by running the interpreter and verifying
+Tests all 37 workflow variations by running the interpreter and verifying
 that each modification was correctly applied to the output workflow.
+
+Tests 1-26: Single feature modifications
+Tests 27-37: Multi-feature combination scenarios
 """
 
 import json
@@ -13,7 +16,7 @@ from browser_agent.comfyui.workflow_interpreter import WorkflowInterpreter
 
 
 class TestInterpreterIntegration:
-    """Integration tests for workflow interpreter with all 26 test cases."""
+    """Integration tests for workflow interpreter with all 37 test cases."""
     
     @pytest.fixture(scope="class")
     def interpreter(self):
@@ -259,7 +262,10 @@ class TestInterpreterIntegration:
                 break
         
         assert high_lora is not None, "High noise LoRA not found"
-        assert "high" in high_lora["lora"].lower(), f"High LoRA path should contain 'high': {high_lora['lora']}"
+        # Check for various high noise patterns: "high", "-H-", "_HIGH", etc.
+        lora_lower = high_lora["lora"].lower()
+        has_high_pattern = any(pattern in lora_lower for pattern in ["high", "-h-", "_high_", "high_noise"])
+        assert has_high_pattern, f"High LoRA path should contain high noise indicator: {high_lora['lora']}"
         assert high_lora["strength"] == 0.8, f"LoRA strength should be 0.8, got {high_lora['strength']}"
     
     # Test 11: Two LoRA pairs
@@ -536,3 +542,291 @@ class TestInterpreterIntegration:
         
         assert ratio_0 == 1.5, f"Upscale ratio[0] should be 1.5, got {ratio_0}"
         assert ratio_1 == 1.5, f"Upscale ratio[1] should be 1.5, got {ratio_1}"
+    
+    # Test 27: Basic output configuration
+    def test_27_output_config(self, interpreter, original_workflow):
+        """Test 27: Combination - duration, size, frame rate."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/27_output_config_f0917eb4.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify duration = 10.0
+        duration = self._get_widget_value(result, 426, 0)
+        assert duration == 10.0, f"Duration should be 10.0, got {duration}"
+        
+        # Verify size = 768x1024
+        size_node = self._get_node(result, 83)
+        assert size_node["properties"]["valueX"] == 768
+        assert size_node["properties"]["valueY"] == 1024
+        
+        # Verify frame rate = 24.0
+        frame_rate = self._get_widget_value(result, 490, 0)
+        assert frame_rate == 24.0, f"Frame rate should be 24.0, got {frame_rate}"
+    
+    # Test 28: Generation quality tuning
+    def test_28_quality_tuning(self, interpreter, original_workflow):
+        """Test 28: Combination - steps, CFG, seed."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/28_quality_tuning_e2639278.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify steps = 25
+        steps = self._get_widget_value(result, 82, 0)
+        assert steps == 25, f"Steps should be 25, got {steps}"
+        
+        # Verify CFG = 4.5
+        cfg = self._get_widget_value(result, 85, 0)
+        assert cfg == 4.5, f"CFG should be 4.5, got {cfg}"
+        
+        # Verify seed = 999888777666
+        seed = self._get_widget_value(result, 73, 0)
+        assert seed == 999888777666, f"Seed should be 999888777666, got {seed}"
+    
+    # Test 29: Temporal control
+    def test_29_temporal_control(self, interpreter, original_workflow):
+        """Test 29: Combination - frame rate, speed, interpolation."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/29_temporal_control_94249ee0.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify frame rate = 12.0
+        frame_rate = self._get_widget_value(result, 490, 0)
+        assert frame_rate == 12.0, f"Frame rate should be 12.0, got {frame_rate}"
+        
+        # Verify speed = 5.0
+        speed = self._get_widget_value(result, 157, 0)
+        assert speed == 5.0, f"Speed should be 5.0, got {speed}"
+        
+        # Verify interpolation enabled (nodes 431, 442 mode 0)
+        node_431 = self._get_node(result, 431)
+        node_442 = self._get_node(result, 442)
+        assert node_431["mode"] == 0, "Interpolation node 431 should be enabled"
+        assert node_442["mode"] == 0, "Interpolation node 442 should be enabled"
+    
+    # Test 30: Enhancement pipeline
+    def test_30_enhancement_pipeline(self, interpreter, original_workflow):
+        """Test 30: Combination - 1 LoRA, upscale ratio, duration."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/30_enhancement_pipeline_9323355a.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify 1 LoRA added
+        lora_count_416 = self._count_loras(result, 416)
+        lora_count_471 = self._count_loras(result, 471)
+        assert lora_count_416 >= 1, f"Node 416 should have at least 1 LoRA, got {lora_count_416}"
+        assert lora_count_471 >= 1, f"Node 471 should have at least 1 LoRA, got {lora_count_471}"
+        
+        # Verify upscale ratio = 1.8
+        ratio = self._get_widget_value(result, 421, 0)
+        assert ratio == 1.8, f"Upscale ratio should be 1.8, got {ratio}"
+        
+        # Verify duration = 5.0
+        duration = self._get_widget_value(result, 426, 0)
+        assert duration == 5.0, f"Duration should be 5.0, got {duration}"
+    
+    # Test 31: Quality enhancement stack
+    def test_31_quality_enhancement_stack(self, interpreter, original_workflow):
+        """Test 31: Combination - interpolation, video enhancer, CFG Zero Star."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/31_quality_enhancement_stack_b81964bf.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify interpolation enabled
+        node_431 = self._get_node(result, 431)
+        assert node_431["mode"] == 0, "Interpolation should be enabled"
+        
+        # Verify video enhancer enabled (nodes 481, 482)
+        node_481 = self._get_node(result, 481)
+        node_482 = self._get_node(result, 482)
+        assert node_481["mode"] in [0, 4], "Video enhancer node 481 should be enabled"
+        assert node_482["mode"] in [0, 4], "Video enhancer node 482 should be enabled"
+        
+        # Verify CFG Zero Star enabled (nodes 483, 484)
+        node_483 = self._get_node(result, 483)
+        node_484 = self._get_node(result, 484)
+        assert node_483["mode"] in [0, 4], "CFG Zero node 483 should be enabled"
+        assert node_484["mode"] in [0, 4], "CFG Zero node 484 should be enabled"
+    
+    # Test 32: Performance optimization
+    def test_32_performance_optimization(self, interpreter, original_workflow):
+        """Test 32: Combination - block swap, VRAM reduction."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/32_performance_optimization_e9ac2bd9.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify block swap enabled (nodes 500, 501)
+        node_500 = self._get_node(result, 500)
+        node_501 = self._get_node(result, 501)
+        assert node_500["mode"] == 0, "BlockSwap node 500 should be enabled"
+        assert node_501["mode"] == 0, "BlockSwap node 501 should be enabled"
+        
+        # Verify VRAM reduction = 75
+        vram = self._get_widget_value(result, 502, 0)
+        assert vram == 75, f"VRAM reduction should be 75, got {vram}"
+    
+    # Test 33: Minimal features
+    def test_33_minimal_features(self, interpreter, original_workflow):
+        """Test 33: Combination - disable interpolation, upscaler, video enhancer, CFG Zero."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/33_minimal_features_3a245c8b.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify interpolation disabled
+        node_431 = self._get_node(result, 431)
+        assert node_431["mode"] == 2, "Interpolation should be disabled (mode 2)"
+        
+        # Verify upscaler disabled
+        node_385 = self._get_node(result, 385)
+        assert node_385["mode"] == 2, "Upscaler should be disabled (mode 2)"
+        
+        # Verify video enhancer disabled
+        node_481 = self._get_node(result, 481)
+        assert node_481["mode"] in [2, 4], "Video enhancer should be disabled"
+        
+        # Verify CFG Zero disabled
+        node_483 = self._get_node(result, 483)
+        assert node_483["mode"] in [2, 4], "CFG Zero should be disabled"
+    
+    # Test 34: Full quality mode
+    def test_34_full_quality_mode(self, interpreter, original_workflow):
+        """Test 34: Combination - all 3 output saves, upscaler enabled."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/34_full_quality_mode_96a4278f.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify all output save nodes enabled
+        node_398 = self._get_node(result, 398)  # Output
+        node_433 = self._get_node(result, 433)  # Save Interpoled
+        node_419 = self._get_node(result, 419)  # Save Upscaled
+        
+        assert node_398["mode"] == 0, "Output save should be enabled"
+        assert node_433["mode"] == 0, "Save Interpoled should be enabled"
+        assert node_419["mode"] == 0, "Save Upscaled should be enabled"
+        
+        # Verify upscaler processing enabled
+        node_385 = self._get_node(result, 385)
+        assert node_385["mode"] == 0, "Upscaler processing should be enabled"
+    
+    # Test 35: Complete output config
+    def test_35_complete_output_config(self, interpreter, original_workflow):
+        """Test 35: Combination - duration, size, frame rate, steps."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/35_complete_output_config_f145bbb1.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify duration = 6.0
+        duration = self._get_widget_value(result, 426, 0)
+        assert duration == 6.0, f"Duration should be 6.0, got {duration}"
+        
+        # Verify size = 640x896
+        size_node = self._get_node(result, 83)
+        assert size_node["properties"]["valueX"] == 640
+        assert size_node["properties"]["valueY"] == 896
+        
+        # Verify frame rate = 20.0
+        frame_rate = self._get_widget_value(result, 490, 0)
+        assert frame_rate == 20.0, f"Frame rate should be 20.0, got {frame_rate}"
+        
+        # Verify steps = 25
+        steps = self._get_widget_value(result, 82, 0)
+        assert steps == 25, f"Steps should be 25, got {steps}"
+    
+    # Test 36: Advanced generation setup
+    def test_36_advanced_generation_setup(self, interpreter, original_workflow):
+        """Test 36: Combination - 2 LoRAs, steps, CFG, seed, normalized attention."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/36_advanced_generation_setup_8bf5b33e.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify 2 LoRAs added
+        lora_count_416 = self._count_loras(result, 416)
+        lora_count_471 = self._count_loras(result, 471)
+        assert lora_count_416 >= 2, f"Node 416 should have at least 2 LoRAs, got {lora_count_416}"
+        assert lora_count_471 >= 2, f"Node 471 should have at least 2 LoRAs, got {lora_count_471}"
+        
+        # Verify steps = 20
+        steps = self._get_widget_value(result, 82, 0)
+        assert steps == 20, f"Steps should be 20, got {steps}"
+        
+        # Verify CFG = 4.0
+        cfg = self._get_widget_value(result, 85, 0)
+        assert cfg == 4.0, f"CFG should be 4.0, got {cfg}"
+        
+        # Verify seed = 555444333222
+        seed = self._get_widget_value(result, 73, 0)
+        assert seed == 555444333222, f"Seed should be 555444333222, got {seed}"
+        
+        # Verify normalized attention enabled (nodes 485, 486)
+        node_485 = self._get_node(result, 485)
+        node_486 = self._get_node(result, 486)
+        assert node_485["mode"] == 0, "NAG node 485 should be enabled"
+        assert node_486["mode"] == 0, "NAG node 486 should be enabled"
+    
+    # Test 37: UPINT with multiple LoRAs
+    def test_37_upint_multiple_loras(self, interpreter, original_workflow):
+        """Test 37: Combination - UPINT output, 2 LoRAs."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/37_upint_multiple_loras_1fed014f.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify 2 LoRAs added
+        lora_count_416 = self._count_loras(result, 416)
+        lora_count_471 = self._count_loras(result, 471)
+        assert lora_count_416 >= 2, f"Node 416 should have at least 2 LoRAs, got {lora_count_416}"
+        assert lora_count_471 >= 2, f"Node 471 should have at least 2 LoRAs, got {lora_count_471}"
+        
+        # Verify UPINT output enabled (node 443)
+        node_443 = self._get_node(result, 443)
+        assert node_443["mode"] == 0, "UPINT save should be enabled"
+        
+        # Verify interpolation enabled (auto-enabled with UPINT)
+        node_442 = self._get_node(result, 442)
+        assert node_442["mode"] == 0, "Interpolation should be enabled for UPINT"
+        
+        # Verify upscaler enabled (auto-enabled with UPINT)
+        node_437 = self._get_node(result, 437)
+        assert node_437["mode"] == 0, "Upscaler should be enabled for UPINT"

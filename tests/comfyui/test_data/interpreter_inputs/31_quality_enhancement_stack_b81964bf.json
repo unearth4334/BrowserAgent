@@ -1,0 +1,9 @@
+{
+  "workflow_id": "b81964bf",
+  "description": "Test 31: Quality enhancement stack - interpolation, video enhancer, and CFG Zero Star all enabled",
+  "changes": {
+    "enable_interpolation": true,
+    "use_video_enhancer": true,
+    "use_cfg_zero_star": true
+  }
+}

@@ -418,10 +418,11 @@ class WorkflowInterpreter:
         """Apply an AddLoRAPairAction to the workflow."""
         # Determine which node to add to based on the action's lora_path
         # High noise LoRAs go to high_node_id, low noise to low_node_id
-        # If path contains "high", use high_node_id, if "low", use low_node_id
-        if "high" in action.lora_path.lower():
+        # Check for various patterns: "high", "-H-", "_HIGH", etc.
+        lora_path_lower = action.lora_path.lower()
+        if any(pattern in lora_path_lower for pattern in ["high", "-h-", "_high_", "high_noise"]):
             target_node_id = action.high_node_id
-        elif "low" in action.lora_path.lower():
+        elif any(pattern in lora_path_lower for pattern in ["low", "-l-", "_low_", "low_noise"]):
             target_node_id = action.low_node_id
         else:
             # Default to high node if unclear
@@ -468,6 +469,7 @@ class WorkflowInterpreter:
             return
         
         widgets_values = node.get("widgets_values", [])
+        properties = node.get("properties", {})
         
         # Update X values if provided
         if action.x_value is not None and action.x_indices:
@@ -476,6 +478,11 @@ class WorkflowInterpreter:
                     old_value = widgets_values[idx]
                     widgets_values[idx] = action.x_value
                     logger.debug(f"Node {action.node_id}[{idx}] X: {old_value} -> {action.x_value}")
+            # Also update properties.valueX if it exists
+            if "valueX" in properties:
+                old_value = properties["valueX"]
+                properties["valueX"] = action.x_value
+                logger.debug(f"Node {action.node_id} property valueX: {old_value} -> {action.x_value}")
         
         # Update Y values if provided
         if action.y_value is not None and action.y_indices:
@@ -484,6 +491,11 @@ class WorkflowInterpreter:
                     old_value = widgets_values[idx]
                     widgets_values[idx] = action.y_value
                     logger.debug(f"Node {action.node_id}[{idx}] Y: {old_value} -> {action.y_value}")
+            # Also update properties.valueY if it exists
+            if "valueY" in properties:
+                old_value = properties["valueY"]
+                properties["valueY"] = action.y_value
+                logger.debug(f"Node {action.node_id} property valueY: {old_value} -> {action.y_value}")
     
     def process(
         self, 
