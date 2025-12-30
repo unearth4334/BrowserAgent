@@ -48,9 +48,7 @@
         "save_original_output": true,
         "save_interpoled_output": true,
         "save_upscaled_output": false,
-        "enable_interpolation": true,
-        "use_upscaler": true,
-        "enable_upscale_interpolation": true
+        "save_upint_output": true
       },
       "quality_enhancements": {
         "enable_video_enhancer": true,

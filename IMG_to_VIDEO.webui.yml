@@ -103,38 +103,25 @@ node_mapping:
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
-    
-  enable_interpolation:
-    node_ids: [431]
-    node_type: "Interpolation processing"
-    action_type: "toggle_node_mode"
-    enabled_mode: 0
-    disabled_mode: 2
   
+  # Three independent output pipelines (simplified controls)
   save_interpoled_output:
-    node_ids: [433]
-    node_type: "Save Interpoled"
-    action_type: "toggle_node_mode"
-    enabled_mode: 0
-    disabled_mode: 2
-    
-  use_upscaler:
-    node_ids: [385]
-    node_type: "Upscale processing"
+    node_ids: [431, 433]
+    node_type: "Standalone Interpolation Pipeline (RIFE + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
   
   save_upscaled_output:
-    node_ids: [419]
-    node_type: "Save Upscaled"
+    node_ids: [385, 419]
+    node_type: "Standalone Upscaler Pipeline (Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
     
-  enable_upscale_interpolation:
+  save_upint_output:
     node_ids: [442, 437, 443]
-    node_type: "UPINT processing (RIFE + Upscaler + Save)"
+    node_type: "UPINT Pipeline (RIFE + Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2

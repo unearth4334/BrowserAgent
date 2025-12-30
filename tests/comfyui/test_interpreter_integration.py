@@ -332,19 +332,12 @@ class TestInterpreterIntegration:
         actions = interpreter.generate_actions(inputs)
         result = interpreter.apply_actions(original_workflow, actions)
         
-        # Verify combined output save node 443 is enabled
-        # Note: Processing nodes are controlled by enable_interpolation (which is true in this test)
-        node = self._get_node(result, 443)
-        assert node is not None, "Node 443 (Save UPINT) should exist"
-        mode = node.get("mode", 0)
-        assert mode == 0, f"Node 443 should be enabled (mode 0), got {mode}"
-        
-        # Also verify interpolation nodes are enabled (since enable_interpolation is true)
-        for node_id in [431, 442, 433]:
+        # Verify UPINT pipeline is enabled (nodes 442, 437, 443)
+        for node_id in [442, 437, 443]:
             node = self._get_node(result, node_id)
-            assert node is not None, f"Node {node_id} should exist"
+            assert node is not None, f"Node {node_id} (UPINT) should exist"
             mode = node.get("mode", 0)
-            assert mode == 0, f"Node {node_id} should be enabled (mode 0), got {mode}"
+            assert mode == 0, f"Node {node_id} (UPINT) should be enabled (mode 0), got {mode}"
     
     # Test 15: Upscaler enabled
     def test_15_upscaler_yes(self, interpreter, original_workflow):

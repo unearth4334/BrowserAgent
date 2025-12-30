@@ -88,44 +88,38 @@ The WorkflowInterpreter expects a specific JSON structure with nested dictionari
 
 #### 4.1 Output Enhancement (`inputs.advanced_features.output_enhancement`)
 
-**CRITICAL: Three Independent Output Pipelines**
+**SIMPLIFIED: Three Independent Output Pipelines**
 
-The system has THREE separate output processing pipelines:
-
-1. **Standalone Interpolation Pipeline**: Nodes 431 (RIFE processing) + 433 (Save)
-2. **Standalone Upscaler Pipeline**: Nodes 385 (Upscale processing) + 419 (Save)
-3. **UPINT Pipeline** (combined upscale+interpolation): Nodes 442 (RIFE) + 437 (Upscaler) + 443 (Save)
+The system has **three separate output pipelines**. Each is controlled by a single toggle:
 
 ```json
 {
-  "enable_upscale_interpolation": false,   // Boolean: Enable UPINT pipeline (nodes 442, 437, 443)
   "save_last_frame": false,                // Boolean: Save final frame as image
   "save_original_output": true,            // Boolean: Save original video output
-  "save_interpoled_output": false,         // Boolean: Save standalone interpolation output (node 433)
-  "save_upscaled_output": false,           // Boolean: Save standalone upscaler output (node 419)
-  "save_upint_output": true,               // Boolean: Save UPINT output (node 443)
-  "enable_interpolation": false,           // Boolean: Enable standalone interpolation processing (node 431)
-  "use_upscaler": false                    // Boolean: Enable standalone upscaler processing (node 385)
+  "save_interpoled_output": false,         // Boolean: Standalone Interpolation (nodes 431 + 433)
+  "save_upscaled_output": false,           // Boolean: Standalone Upscaler (nodes 385 + 419)
+  "save_upint_output": true                // Boolean: Combined UPINT (nodes 442 + 437 + 443)
 }
 ```
 
-**Field Ordering Requirements:**
-⚠️ **IMPORTANT**: `enable_upscale_interpolation` MUST appear FIRST in the JSON object to prevent action conflicts. If it appears last, it will override the standalone pipeline settings.
+**Pipeline Details:**
 
-**Recommended Order:**
-1. `enable_upscale_interpolation`
-2. `save_last_frame`
-3. `save_original_output`
-4. `save_interpoled_output`
-5. `save_upscaled_output`
-6. `save_upint_output`
-7. `enable_interpolation`
-8. `use_upscaler`
+1. **`save_interpoled_output`**: Standalone Interpolation Pipeline
+   - Enables processing node 431 (RIFE interpolation)
+   - Enables save node 433 (Save Interpoled)
+   - Use when you want interpolated video as standalone output
 
-**Logical Dependencies:**
-- To save interpolated output: Must set both `enable_interpolation: true` AND `save_interpoled_output: true`
-- To save upscaled output: Must set both `use_upscaler: true` AND `save_upscaled_output: true`
-- UPINT is independent: Only needs `enable_upscale_interpolation: true` (uses its own nodes 442, 437, 443)
+2. **`save_upscaled_output`**: Standalone Upscaler Pipeline
+   - Enables processing node 385 (Upscaler)
+   - Enables save node 419 (Save Upscaled)
+   - Use when you want upscaled video as standalone output
+
+3. **`save_upint_output`**: UPINT Pipeline (Combined)
+   - Enables processing nodes 442 (RIFE) + 437 (Upscaler)
+   - Enables save node 443 (Save UPINT)
+   - Use when you want combined upscale+interpolation output
+
+**All three pipelines are completely independent** - you can enable any combination.
 
 #### 4.2 Quality Enhancements (`inputs.advanced_features.quality_enhancements`)
 ```json
@@ -202,14 +196,11 @@ The system has THREE separate output processing pipelines:
     },
     "advanced_features": {
       "output_enhancement": {
-        "enable_upscale_interpolation": true,
         "save_last_frame": false,
         "save_original_output": true,
         "save_interpoled_output": false,
         "save_upscaled_output": false,
-        "save_upint_output": true,
-        "enable_interpolation": false,
-        "use_upscaler": false
+        "save_upint_output": true
       },
       "quality_enhancements": {
         "enable_video_enhancer": true,
