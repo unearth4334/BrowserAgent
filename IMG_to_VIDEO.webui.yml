@@ -106,11 +106,12 @@ node_mapping:
   
   # Three independent output pipelines (simplified controls)
   save_interpoled_output:
-    node_ids: [431, 433]
+    node_ids: [430, 431, 433]
     node_type: "Standalone Interpolation Pipeline (RIFE + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
+    save_node_id: 433  # VHS_VideoCombine node that needs save_output toggled
   
   save_upscaled_output:
     node_ids: [385, 419]
@@ -118,13 +119,15 @@ node_mapping:
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
+    save_node_id: 419  # VHS_VideoCombine node that needs save_output toggled
     
   save_upint_output:
-    node_ids: [442, 437, 443]
+    node_ids: [440, 441, 442, 437, 443]
     node_type: "UPINT Pipeline (RIFE + Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
+    save_node_id: 443  # VHS_VideoCombine node that needs save_output toggled
     
   enable_video_enhancer:
     node_ids: [481, 482]
