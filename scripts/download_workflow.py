@@ -16,7 +16,7 @@ REMOTE_PORT = "40671"
 REMOTE_USER = "root"
 
 # Default file path on remote
-DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/UmeAiRT/WAN2.2_IMG_to_VIDEO_Base.json"
+DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/webui_test_output.json"
 
 def download_workflow(remote_path: str, local_path: str, description: str = None, verbose: bool = True):
     """
