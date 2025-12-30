@@ -1,24 +1,23 @@
 {
-  "description": "Test 29: Temporal control combo - frame rate 12, speed 5, enable interpolation",
-  "test_id": "29_temporal_control",
-  "expected_hash": "94249ee0",
-  "workflow_file": "outputs/workflows/WAN2.2_IMG_to_VIDEO_Base_29_temporal_control_94249ee0.json",
+  "description": "Test 39: UPINT only output with 2 LoRAs and custom size - Save only final upscale+interpolation output, disable intermediate saves",
+  "test_id": "39_upint_only_output_two_loras",
+  "notes": "Tests enabling UPINT while disabling intermediate interpolation and upscale saves. Includes 2 LoRAs and custom image size (768x1024).",
   
   "inputs": {
     "basic_settings": {
-      "input_image": null,
+      "input_image": "61603705.jpeg",
       "positive_prompt": " The young woman turns towards the camera",
       "negative_prompt": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走, fast movements, blurry, mouth moving, talking, teeth visible, strong blush",
       "seed": 701609645127340
     },
     "generation_parameters": {
-      "size_x": 896,
-      "size_y": 1120,
+      "size_x": 768,
+      "size_y": 1024,
       "duration": 5.0,
       "steps": 20,
       "cfg": 3.0,
-      "frame_rate": 12.0,
-      "speed": 5.0,
+      "frame_rate": 16.0,
+      "speed": 7.0,
       "upscale_ratio": 2.0
     },
     "model_selection": {
@@ -26,17 +25,31 @@
         "high_noise": "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_high_noise_14B_fp16.safetensors",
         "low_noise": "Wan-2.2_ComfyUI_repackaged/wan2.2_i2v_low_noise_14B_fp16.safetensors"
       },
-      "loras": [],
+      "loras": [
+        {
+          "high_noise": "WAN DR34ML4Y - All-In-One NSFW/DR34ML4Y_I2V_14B_HIGH-mid_1811313-vid_2176505.safetensors",
+          "low_noise": "WAN DR34ML4Y - All-In-One NSFW/DR34ML4Y_I2V_14B_LOW-mid_1811313-vid_2190476.safetensors",
+          "strength": 1.0
+        },
+        {
+          "high_noise": "(wan 2.2 experimental) WAN General NSFW model/NSFW-22-H-e8-mid_1307155-vid_2073605.safetensors",
+          "low_noise": "(wan 2.2 experimental) WAN General NSFW model/NSFW-22-L-e8-mid_1307155-vid_2083303.safetensors",
+          "strength": 0.8
+        }
+      ],
       "clip_model": "Wan-2.2/umt5_xxl_fp16.safetensors",
       "vae_model": "Wan-2.1/wan_2.1_vae.safetensors",
       "upscale_model": "RealESRGAN_x4plus.pth"
     },
     "advanced_features": {
       "output_enhancement": {
-        "enable_upscale_interpolation": false,
+        "enable_upscale_interpolation": true,
         "save_last_frame": false,
-        "enable_interpolation": true,
-        "save_interpoled_output": true,
+        "save_original_output": true,
+        "save_interpoled_output": false,
+        "save_upscaled_output": false,
+        "save_upint_output": true,
+        "enable_interpolation": false,
         "use_upscaler": false
       },
       "quality_enhancements": {
@@ -49,7 +62,7 @@
         "enable_magcache": true,
         "enable_torch_compile": false,
         "enable_block_swap": true,
-        "vram_reduction": 100
+        "vram_reduction": 0
       },
       "automatic_prompting": {
         "enable_auto_prompt": true

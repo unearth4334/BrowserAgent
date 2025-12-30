@@ -357,8 +357,8 @@ class TestInterpreterIntegration:
         actions = interpreter.generate_actions(inputs)
         result = interpreter.apply_actions(original_workflow, actions)
         
-        # Verify upscale nodes 385, 437, 419 (processing + save) are enabled (mode 0)
-        for node_id in [385, 437, 419]:
+        # Verify standalone upscaler nodes 385 (processing) and 419 (save) are enabled (mode 0)
+        for node_id in [385, 419]:
             node = self._get_node(result, node_id)
             assert node is not None, f"Node {node_id} should exist"
             mode = node.get("mode", 0)
@@ -609,11 +609,11 @@ class TestInterpreterIntegration:
         speed = self._get_widget_value(result, 157, 0)
         assert speed == 5.0, f"Speed should be 5.0, got {speed}"
         
-        # Verify interpolation enabled (nodes 431, 442 mode 0)
+        # Verify standalone interpolation enabled (nodes 431 processing, 433 save)
         node_431 = self._get_node(result, 431)
-        node_442 = self._get_node(result, 442)
-        assert node_431["mode"] == 0, "Interpolation node 431 should be enabled"
-        assert node_442["mode"] == 0, "Interpolation node 442 should be enabled"
+        node_433 = self._get_node(result, 433)
+        assert node_431["mode"] == 0, "Standalone interpolation node 431 should be enabled"
+        assert node_433["mode"] == 0, "Standalone interpolation save node 433 should be enabled"
     
     # Test 30: Enhancement pipeline
     def test_30_enhancement_pipeline(self, interpreter, original_workflow):
@@ -830,3 +830,65 @@ class TestInterpreterIntegration:
         # Verify upscaler enabled (auto-enabled with UPINT)
         node_437 = self._get_node(result, 437)
         assert node_437["mode"] == 0, "Upscaler should be enabled for UPINT"
+    
+    # Test 38: Input image change
+    def test_38_input_image_change(self, interpreter, original_workflow):
+        """Test 38: Change input image filename (Node 88)."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/38_input_image_change_9de73093.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify input image changed (node 88, index 0)
+        input_image = self._get_widget_value(result, 88, 0)
+        expected_image = "4967f305-da29-4172-9bae-a3a43bb50a19.jpeg"
+        
+        assert input_image == expected_image, f"Input image should be '{expected_image}', got '{input_image}'"
+    
+    # Test 39: UPINT only output with 2 LoRAs
+    def test_39_upint_only_output_two_loras(self, interpreter, original_workflow):
+        """Test 39: UPINT only output with 2 LoRAs, size 768x1024, input image change."""
+        input_file = "tests/comfyui/test_data/interpreter_inputs/39_upint_only_output_two_loras.json"
+        
+        with open(input_file) as f:
+            inputs = json.load(f)
+        
+        actions = interpreter.generate_actions(inputs)
+        result = interpreter.apply_actions(original_workflow, actions)
+        
+        # Verify size changed (node 83: mxSlider2D)
+        size_node = self._get_node(result, 83)
+        assert size_node["properties"]["valueX"] == 768
+        assert size_node["properties"]["valueY"] == 1024
+        
+        # Verify input image changed (node 88, index 0)
+        input_image = self._get_widget_value(result, 88, 0)
+        expected_image = "61603705.jpeg"
+        assert input_image == expected_image, f"Input image should be '{expected_image}', got '{input_image}'"
+        
+        # Verify 2 LoRAs are set (node 416 high prio, node 471 low prio)
+        lora_count_416 = self._count_loras(result, 416)
+        lora_count_471 = self._count_loras(result, 471)
+        assert lora_count_416 >= 2, f"Node 416 should have at least 2 LoRAs, got {lora_count_416}"
+        assert lora_count_471 >= 2, f"Node 471 should have at least 2 LoRAs, got {lora_count_471}"
+        
+        # Verify standalone interpolation disabled (nodes 431, 433 muted)
+        node_431 = self._get_node(result, 431)
+        node_433 = self._get_node(result, 433)
+        assert node_431["mode"] == 2, "Standalone interpolation processing should be disabled"
+        assert node_433["mode"] == 2, "Standalone interpolation save should be disabled"
+        
+        # Verify standalone upscaler disabled (node 419 muted)
+        node_419 = self._get_node(result, 419)
+        assert node_419["mode"] == 2, "Standalone upscaler save should be disabled"
+        
+        # Verify UPINT enabled (shared processing nodes 442, 437 enabled)
+        node_442 = self._get_node(result, 442)
+        node_437 = self._get_node(result, 437)
+        node_443 = self._get_node(result, 443)
+        assert node_442["mode"] == 0, "RIFE node should be enabled for UPINT"
+        assert node_437["mode"] == 0, "Upscaler node should be enabled for UPINT"
+        assert node_443["mode"] == 0, "UPINT save node should be enabled"

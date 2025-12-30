@@ -1,12 +1,12 @@
 {
-  "description": "Test 29: Temporal control combo - frame rate 12, speed 5, enable interpolation",
-  "test_id": "29_temporal_control",
-  "expected_hash": "94249ee0",
-  "workflow_file": "outputs/workflows/WAN2.2_IMG_to_VIDEO_Base_29_temporal_control_94249ee0.json",
+  "description": "Test 38: Input image change - Change input image filename (Node 88)",
+  "test_id": "38_input_image_change",
+  "expected_hash": "9de73093",
+  "workflow_file": "outputs/workflows/WAN2.2_IMG_to_VIDEO_Base_9de73093.json",
   
   "inputs": {
     "basic_settings": {
-      "input_image": null,
+      "input_image": "4967f305-da29-4172-9bae-a3a43bb50a19.jpeg",
       "positive_prompt": " The young woman turns towards the camera",
       "negative_prompt": "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走, fast movements, blurry, mouth moving, talking, teeth visible, strong blush",
       "seed": 701609645127340
@@ -17,8 +17,8 @@
       "duration": 5.0,
       "steps": 20,
       "cfg": 3.0,
-      "frame_rate": 12.0,
-      "speed": 5.0,
+      "frame_rate": 16.0,
+      "speed": 7.0,
       "upscale_ratio": 2.0
     },
     "model_selection": {
@@ -33,11 +33,10 @@
     },
     "advanced_features": {
       "output_enhancement": {
-        "enable_upscale_interpolation": false,
         "save_last_frame": false,
         "enable_interpolation": true,
-        "save_interpoled_output": true,
-        "use_upscaler": false
+        "use_upscaler": false,
+        "enable_upscale_interpolation": false
       },
       "quality_enhancements": {
         "enable_video_enhancer": true,
@@ -49,9 +48,9 @@
         "enable_magcache": true,
         "enable_torch_compile": false,
         "enable_block_swap": true,
-        "vram_reduction": 100
+        "vram_reduction": 0
       },
-      "automatic_prompting": {
+      "prompting": {
         "enable_auto_prompt": true
       }
     }

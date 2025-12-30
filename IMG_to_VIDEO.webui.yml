@@ -71,6 +71,13 @@ node_mapping:
     node_title: "Noise"
     widget_indices: [0]
     action_type: "modify_widget"
+  
+  input_image:
+    node_id: 88
+    node_type: "LoadImage"
+    node_title: "Load Image"
+    widget_indices: [0]
+    action_type: "modify_widget"
     
   # === VECTOR PARAMETERS (mxSlider2D node) ===
   size_x:
@@ -98,28 +105,39 @@ node_mapping:
     disabled_mode: 2
     
   enable_interpolation:
-    node_ids: [431, 442, 433]
-    node_type: "RIFE VFI + Save"
+    node_ids: [431]
+    node_type: "Interpolation processing"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+  
+  save_interpoled_output:
+    node_ids: [433]
+    node_type: "Save Interpoled"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
     
   use_upscaler:
-    node_ids: [385, 437, 419]
-    node_type: "ImageUpscaleWithModel + Save"
+    node_ids: [385]
+    node_type: "Upscale processing"
+    action_type: "toggle_node_mode"
+    enabled_mode: 0
+    disabled_mode: 2
+  
+  save_upscaled_output:
+    node_ids: [419]
+    node_type: "Save Upscaled"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
     
   enable_upscale_interpolation:
-    node_ids: [443]
-    node_type: "Save UPINT (combined output)"
+    node_ids: [442, 437, 443]
+    node_type: "UPINT processing (RIFE + Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
     disabled_mode: 2
-    # Note: This controls the combined upscaled+interpolated output save node only
-    # The processing nodes (385, 431, 437, 442) are controlled by use_upscaler and enable_interpolation
-    # When enabled, produces a third output that is both upscaled AND interpolated
     
   enable_video_enhancer:
     node_ids: [481, 482]
