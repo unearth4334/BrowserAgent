@@ -176,12 +176,12 @@ class TestInterpreterIntegration:
         actions = interpreter.generate_actions(inputs)
         result = interpreter.apply_actions(original_workflow, actions)
         
-        # Verify CFG changed to 5.0 (node 85, indices 0-1)
+        # Verify CFG changed to 5.0 (node 85, index 1 only - preserves min at index 0)
         cfg_0 = self._get_widget_value(result, 85, 0)
         cfg_1 = self._get_widget_value(result, 85, 1)
         
-        assert cfg_0 == 5.0, f"CFG[0] should be 5.0, got {cfg_0}"
-        assert cfg_1 == 5.0, f"CFG[1] should be 5.0, got {cfg_1}"
+        assert cfg_0 == 3, f"CFG[0] (min) should remain 3, got {cfg_0}"
+        assert cfg_1 == 5.0, f"CFG[1] (max) should be 5.0, got {cfg_1}"
     
     # Test 07: Frame rate = 20
     def test_07_frame_rate_20(self, interpreter, original_workflow):
@@ -575,9 +575,9 @@ class TestInterpreterIntegration:
         steps = self._get_widget_value(result, 82, 0)
         assert steps == 25, f"Steps should be 25, got {steps}"
         
-        # Verify CFG = 4.5
-        cfg = self._get_widget_value(result, 85, 0)
-        assert cfg == 4.5, f"CFG should be 4.5, got {cfg}"
+        # Verify CFG = 4.5 (at index 1, min at index 0 remains 3)
+        cfg_max = self._get_widget_value(result, 85, 1)
+        assert cfg_max == 4.5, f"CFG[1] should be 4.5, got {cfg_max}"
         
         # Verify seed = 999888777666
         seed = self._get_widget_value(result, 73, 0)
@@ -781,9 +781,9 @@ class TestInterpreterIntegration:
         steps = self._get_widget_value(result, 82, 0)
         assert steps == 20, f"Steps should be 20, got {steps}"
         
-        # Verify CFG = 4.0
-        cfg = self._get_widget_value(result, 85, 0)
-        assert cfg == 4.0, f"CFG should be 4.0, got {cfg}"
+        # Verify CFG = 4.0 (at index 1, min at index 0 remains 3)
+        cfg_max = self._get_widget_value(result, 85, 1)
+        assert cfg_max == 4.0, f"CFG[1] should be 4.0, got {cfg_max}"
         
         # Verify seed = 555444333222
         seed = self._get_widget_value(result, 73, 0)
