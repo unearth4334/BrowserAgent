@@ -34,7 +34,7 @@ node_mapping:
     node_id: 85
     node_type: "mxSlider"
     node_title: "CFG"
-    widget_indices: [0, 1]
+    widget_indices: [1]  # Only set index 1 (max value), preserve min at index 0
     action_type: "modify_widget"
     
   frame_rate:
