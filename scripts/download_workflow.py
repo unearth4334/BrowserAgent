@@ -12,11 +12,11 @@ from datetime import datetime
 
 # Remote connection details
 REMOTE_HOST = "198.53.64.194"
-REMOTE_PORT = "40671"
+REMOTE_PORT = "40548"
 REMOTE_USER = "root"
 
 # Default file path on remote
-DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/webui_test_output.json"
+DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/workflow_219a9def.json"
 
 def download_workflow(remote_path: str, local_path: str, description: str = None, verbose: bool = True):
     """
