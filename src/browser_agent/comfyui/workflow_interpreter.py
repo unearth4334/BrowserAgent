@@ -398,6 +398,14 @@ class WorkflowInterpreter:
                 logger.debug(f"Node {action.node_id}[{idx}]: {old_value} -> {value}")
             else:
                 logger.warning(f"Widget index {idx} out of range for node {action.node_id}")
+        
+        # For mxSlider nodes, also update the properties.value field
+        if action.node_type == "mxSlider" and isinstance(action.value, (int, float)):
+            properties = node.get("properties", {})
+            if "value" in properties:
+                old_prop_value = properties["value"]
+                properties["value"] = float(action.value)
+                logger.debug(f"Node {action.node_id} properties.value: {old_prop_value} -> {action.value}")
     
     def _apply_toggle_mode(
         self, 
