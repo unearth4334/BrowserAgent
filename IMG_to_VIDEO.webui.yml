@@ -114,7 +114,7 @@ node_mapping:
     save_node_id: 433  # VHS_VideoCombine node that needs save_output toggled
   
   save_upscaled_output:
-    node_ids: [385, 419]
+    node_ids: [385, 418, 419, 422, 423]
     node_type: "Standalone Upscaler Pipeline (Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0

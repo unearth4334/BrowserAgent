@@ -332,8 +332,8 @@ class TestInterpreterIntegration:
         actions = interpreter.generate_actions(inputs)
         result = interpreter.apply_actions(original_workflow, actions)
         
-        # Verify UPINT pipeline is enabled (nodes 442, 437, 443)
-        for node_id in [442, 437, 443]:
+        # Verify UPINT pipeline is enabled (nodes 440, 441, 442, 437, 443, 438, 439)
+        for node_id in [440, 441, 442, 437, 443, 438, 439]:
             node = self._get_node(result, node_id)
             assert node is not None, f"Node {node_id} (UPINT) should exist"
             mode = node.get("mode", 0)
@@ -350,8 +350,8 @@ class TestInterpreterIntegration:
         actions = interpreter.generate_actions(inputs)
         result = interpreter.apply_actions(original_workflow, actions)
         
-        # Verify standalone upscaler nodes 385 (processing) and 419 (save) are enabled (mode 0)
-        for node_id in [385, 419]:
+        # Verify standalone upscaler nodes (385, 418, 419, 422, 423) are enabled (mode 0)
+        for node_id in [385, 418, 419, 422, 423]:
             node = self._get_node(result, node_id)
             assert node is not None, f"Node {node_id} should exist"
             mode = node.get("mode", 0)
