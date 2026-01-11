@@ -122,7 +122,7 @@ node_mapping:
     save_node_id: 419  # VHS_VideoCombine node that needs save_output toggled
     
   save_upint_output:
-    node_ids: [440, 441, 442, 437, 443]
+    node_ids: [440, 441, 442, 437, 443, 438, 439]
     node_type: "UPINT Pipeline (RIFE + Upscaler + Save)"
     action_type: "toggle_node_mode"
     enabled_mode: 0
