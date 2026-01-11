@@ -297,11 +297,12 @@ class TestInterpreterIntegration:
         actions = interpreter.generate_actions(inputs)
         result = interpreter.apply_actions(original_workflow, actions)
         
-        # Verify node 447 (SaveImage) is enabled (mode 0)
-        node = self._get_node(result, 447)
-        assert node is not None, "Node 447 should exist"
-        mode = node.get("mode", 0)
-        assert mode == 0, f"Node 447 should be enabled (mode 0), got {mode}"
+        # Verify save_last_frame nodes (444, 447) are enabled (mode 0)
+        for node_id in [444, 447]:
+            node = self._get_node(result, node_id)
+            assert node is not None, f"Node {node_id} should exist"
+            mode = node.get("mode", 0)
+            assert mode == 0, f"Node {node_id} should be enabled (mode 0), got {mode}"
     
     # Test 13: Interpolation disabled
     def test_13_interpolation_no(self, interpreter, original_workflow):
