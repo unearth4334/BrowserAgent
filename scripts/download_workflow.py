@@ -16,7 +16,7 @@ REMOTE_PORT = "40548"
 REMOTE_USER = "root"
 
 # Default file path on remote
-DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/workflow_219a9def.json"
+DEFAULT_REMOTE_PATH = "/workspace/ComfyUI/user/default/workflows/test_float_fix.json"
 
 def download_workflow(remote_path: str, local_path: str, description: str = None, verbose: bool = True):
     """
