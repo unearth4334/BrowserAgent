@@ -24,3 +24,5 @@ class PageObservation:
     buttons: List[ButtonInfo]
     inputs: List[InputInfo]
     raw_html: Optional[str] = None
+    screenshot_path: Optional[str] = None  # Path to screenshot file if captured
+    screenshot_data: Optional[bytes] = None  # Raw screenshot bytes if available

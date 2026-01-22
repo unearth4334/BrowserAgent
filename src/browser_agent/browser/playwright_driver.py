@@ -8,7 +8,8 @@ from playwright.sync_api import sync_playwright, Browser as PWBrowser, Page, Err
 
 from .actions import (
     Action, Navigate, Click, Type, WaitForSelector, WaitForUser, 
-    ExtractLinks, ExtractHTML, ExecuteJS, UploadFile, SelectOption, SetSlider
+    ExtractLinks, ExtractHTML, ExecuteJS, UploadFile, SelectOption, SetSlider,
+    Screenshot, ClickAtCoordinates
 )
 from .observation import PageObservation, ButtonInfo, InputInfo
 from ..logging_utils import get_logger
@@ -224,6 +225,26 @@ class PlaywrightBrowserController:
                     f"document.querySelector('{action.selector}').dispatchEvent(new Event('change'));"
                 )
                 logger.info("Set slider %s to value %s", action.selector, action.value)
+            elif isinstance(action, Screenshot):
+                # Take a screenshot
+                os.makedirs(os.path.dirname(action.path) if os.path.dirname(action.path) else ".", exist_ok=True)
+                screenshot_options = {"path": action.path}
+                if action.full_page:
+                    screenshot_options["full_page"] = True
+                if action.selector:
+                    element = page.query_selector(action.selector)
+                    if element:
+                        element.screenshot(**screenshot_options)
+                        logger.info("Screenshot of element %s saved to %s", action.selector, action.path)
+                    else:
+                        logger.warning("Element not found for screenshot: %s", action.selector)
+                else:
+                    page.screenshot(**screenshot_options)
+                    logger.info("Screenshot saved to %s", action.path)
+            elif isinstance(action, ClickAtCoordinates):
+                # Click at specific coordinates
+                page.mouse.click(action.x, action.y, button=action.button)
+                logger.info("Clicked at coordinates (%d, %d) with %s button", action.x, action.y, action.button)
             else:  # pragma: no cover - safety
                 raise ValueError(f"Unknown action type {action}")
         except Exception as e:

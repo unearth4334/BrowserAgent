@@ -72,6 +72,22 @@ class SetSlider:
     value: float
 
 
+@dataclass
+class Screenshot:
+    """Capture a screenshot of the current page or element."""
+    path: str
+    selector: str | None = None  # If provided, screenshot only this element
+    full_page: bool = False  # If True, capture full scrollable page
+
+
+@dataclass
+class ClickAtCoordinates:
+    """Click at specific x, y coordinates on the page."""
+    x: int
+    y: int
+    button: str = "left"  # "left", "right", or "middle"
+
+
 Action = Union[
     Navigate,
     Click,
@@ -84,4 +100,6 @@ Action = Union[
     UploadFile,
     SelectOption,
     SetSlider,
+    Screenshot,
+    ClickAtCoordinates,
 ]

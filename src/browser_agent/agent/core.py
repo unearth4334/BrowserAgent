@@ -27,17 +27,23 @@ class Policy(Protocol):
 
 
 class Agent:
-    def __init__(self, policy: Policy | None = None, max_steps: int = 20):
+    def __init__(
+        self, 
+        browser: BrowserController,
+        policy: Policy | None = None, 
+        max_steps: int = 20
+    ):
+        self.browser = browser
         self.policy = policy or SimpleRuleBasedPolicy()  # type: ignore[arg-type]
         self.max_steps = max_steps
 
     def run_task(
-        self, task: BaseTaskSpec, browser: BrowserController
+        self, task: BaseTaskSpec
     ) -> TaskResult:
-        browser.start()
+        self.browser.start()
         state = TaskState()
 
-        obs = browser.get_observation()
+        obs = self.browser.get_observation()
         while state.steps < self.max_steps:
             state.steps += 1
 
@@ -52,8 +58,8 @@ class Agent:
                 return TaskResult(False, state.reason or "Task failed", obs)
 
             action = self.policy.decide(obs, task, state)
-            browser.perform(action)
-            obs = browser.get_observation()
+            self.browser.perform(action)
+            obs = self.browser.get_observation()
 
         logger.warning("Max steps exceeded")
         return TaskResult(False, "Max steps exceeded", obs)
