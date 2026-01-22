@@ -47,6 +47,8 @@ class PlaywrightBrowserController:
     extra_launch_args: list[str] = field(default_factory=list)
     screenshot_on_error: bool = False
     screenshot_dir: str = "/tmp/browser-agent-screenshots"
+    viewport_width: int = 1920  # Default to 1920x1080
+    viewport_height: int = 1080
 
     _playwright: Optional[object] = field(default=None, init=False)
     _browser: Optional[PWBrowser] = field(default=None, init=False)
@@ -100,8 +102,10 @@ class PlaywrightBrowserController:
 
             self._browser = browser_type.launch(**launch_args)
             
-            # Create page with timeouts
-            self._page = self._browser.new_page()
+            # Create page with timeouts and viewport size
+            self._page = self._browser.new_page(
+                viewport={"width": self.viewport_width, "height": self.viewport_height}
+            )
             self._page.set_default_timeout(self.navigation_timeout)
             self._page.set_default_navigation_timeout(self.navigation_timeout)
             
