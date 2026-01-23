@@ -14,6 +14,7 @@ from typing import Optional, List, Tuple
 from playwright.sync_api import sync_playwright, Page, Browser
 from detect_grok_tiles import TileDetector
 from detect_widest_region import WidestRegionDetector
+from detect_with_background_toggle import RobustTileDetector, RobustMediaPaneDetector
 
 
 class GrokTestApp:
@@ -65,28 +66,49 @@ class GrokTestApp:
         print(f"📸 Screenshot saved to {screenshot_path}")
         return screenshot_path
     
-    def detect_and_display_tiles(self):
-        """Detect tiles and display results."""
+    def detect_and_display_tiles(self, use_robust: bool = False):
+        """Detect tiles and display results.
+        
+        Args:
+            use_robust: If True, use background toggle method, else use traditional method
+        """
         print("\n" + "="*80)
-        print("TILE DETECTION")
+        if use_robust:
+            print("TILE DETECTION (Robust - Background Toggle)")
+        else:
+            print("TILE DETECTION (Traditional)")
         print("="*80)
         
-        # Capture screenshot
-        screenshot_path = self.capture_screenshot("tiles_detection.png")
-        
-        # Detect tiles
-        detector = TileDetector(screenshot_path)
-        tiles = detector.detect_tiles(method="grid")
-        self.detected_tiles = tiles
-        
-        if not tiles:
-            print("⚠️  No tiles detected")
-            return
-        
-        print(f"\n✅ Detected {len(tiles)} tiles")
-        
-        # Draw rectangles on screenshot
-        image = cv2.imread(screenshot_path)
+        if use_robust:
+            # Use robust background toggle detection
+            def capture_func():
+                """Capture screenshot and return as numpy array."""
+                screenshot_path = self.capture_screenshot("temp_capture.png")
+                return cv2.imread(screenshot_path)
+            
+            detector = RobustTileDetector(capture_func)
+            tiles = detector.detect_tiles_with_grid()
+            self.detected_tiles = tiles
+            
+            if not tiles:
+                print("⚠️  No tiles detected")
+                return
+            
+            # Get the most recent screenshot for visualization
+            screenshot_path = self.last_screenshot_path or "grok_test_screenshots/temp_capture.png"
+            image = cv2.imread(screenshot_path)
+        else:
+            # Traditional detection
+            screenshot_path = self.capture_screenshot("tiles_detection.png")
+            detector = TileDetector(screenshot_path)
+            tiles = detector.detect_tiles(method="grid")
+            self.detected_tiles = tiles
+            
+            if not tiles:
+                print("⚠️  No tiles detected")
+                return
+            
+            image = cv2.imread(screenshot_path)
         for idx, (x, y, w, h) in enumerate(tiles, 1):
             # Draw rectangle
             cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 3)
@@ -148,22 +170,44 @@ class GrokTestApp:
         time.sleep(0.5)
         print("✅ Click completed")
     
-    def detect_and_display_media_pane(self):
-        """Detect media pane and display results."""
+    def detect_and_display_media_pane(self, use_robust: bool = False):
+        """Detect media pane and display results.
+        
+        Args:
+            use_robust: If True, use background toggle method, else use traditional method
+        """
         print("\n" + "="*80)
-        print("MEDIA PANE DETECTION")
+        if use_robust:
+            print("MEDIA PANE DETECTION (Robust - Background Toggle)")
+        else:
+            print("MEDIA PANE DETECTION (Traditional)")
         print("="*80)
         
-        # Capture screenshot
-        screenshot_path = self.capture_screenshot("media_pane_detection.png")
-        
-        # Detect media pane using widest region detector
-        detector = WidestRegionDetector(screenshot_path)
-        result = detector.detect_bounds()
-        
-        if not result:
-            print("⚠️  No media pane detected")
-            return
+        if use_robust:
+            # Use robust background toggle detection
+            def capture_func():
+                """Capture screenshot and return as numpy array."""
+                screenshot_path = self.capture_screenshot("temp_capture_media.png")
+                return cv2.imread(screenshot_path)
+            
+            detector = RobustMediaPaneDetector(capture_func)
+            result = detector.detect_bounds()
+            
+            if not result:
+                print("⚠️  No media pane detected")
+                return
+            
+            # Get the most recent screenshot for visualization
+            screenshot_path = self.last_screenshot_path or "grok_test_screenshots/temp_capture_media.png"
+        else:
+            # Traditional detection
+            screenshot_path = self.capture_screenshot("media_pane_detection.png")
+            detector = WidestRegionDetector(screenshot_path)
+            result = detector.detect_bounds()
+            
+            if not result:
+                print("⚠️  No media pane detected")
+                return
         
         x, y, w, h = result
         print(f"\n✅ Detected media pane: ({x}, {y}) {w}x{h}")
@@ -404,11 +448,13 @@ class GrokTestApp:
             print("GROK TEST APP - MAIN MENU")
             print("="*80)
             print("  1. API Command")
-            print("  2. Detect Tiles")
-            print("  3. Click Tile")
-            print("  4. Detect Media Pane")
-            print("  5. Capture Screenshot")
-            print("  6. Open Grok (navigate to Grok)")
+            print("  2. Detect Tiles (Traditional)")
+            print("  3. Detect Tiles (Robust - Background Toggle)")
+            print("  4. Click Tile")
+            print("  5. Detect Media Pane (Traditional)")
+            print("  6. Detect Media Pane (Robust - Background Toggle)")
+            print("  7. Capture Screenshot")
+            print("  8. Open Grok (navigate to Grok)")
             print("  0. Exit")
             print("="*80)
             
@@ -422,9 +468,12 @@ class GrokTestApp:
                 self.api_command_menu()
             
             elif choice == "2":
-                self.detect_and_display_tiles()
+                self.detect_and_display_tiles(use_robust=False)
             
             elif choice == "3":
+                self.detect_and_display_tiles(use_robust=True)
+            
+            elif choice == "4":
                 if not self.detected_tiles:
                     print("⚠️  No tiles detected. Run 'Detect tiles' first.")
                 else:
@@ -435,16 +484,19 @@ class GrokTestApp:
                     except ValueError:
                         print("⚠️  Please enter a valid number")
             
-            elif choice == "4":
-                self.detect_and_display_media_pane()
-            
             elif choice == "5":
+                self.detect_and_display_media_pane(use_robust=False)
+            
+            elif choice == "6":
+                self.detect_and_display_media_pane(use_robust=True)
+            
+            elif choice == "7":
                 filename = input("Enter filename (default: screenshot.png): ").strip()
                 if not filename:
                     filename = "screenshot.png"
                 self.capture_screenshot(filename)
             
-            elif choice == "6":
+            elif choice == "8":
                 grok_url = input("Enter Grok URL (default: https://grok.x.com): ").strip()
                 if not grok_url:
                     grok_url = "https://grok.x.com"
