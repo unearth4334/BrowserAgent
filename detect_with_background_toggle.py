@@ -617,7 +617,7 @@ class RobustMediaPaneDetector(BackgroundToggleDetector):
         img_height = img_ref.shape[0]
         img_width = img_ref.shape[1]
         min_width = int(img_width * min_width_ratio)
-        bottom_threshold = img_height * 0.85
+        bottom_threshold = img_height * 0.95
         
         # Find largest valid region (not in bottom area, not a text field)
         valid_regions = []

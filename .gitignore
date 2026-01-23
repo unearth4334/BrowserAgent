@@ -45,6 +45,7 @@ Thumbs.db
 
 # Output files
 outputs/
+grok_test_screenshots/temp_capture.png
 
 # Credentials
 vastai_credentials.txt
