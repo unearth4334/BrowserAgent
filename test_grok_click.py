@@ -22,8 +22,8 @@ def main():
     controller = PlaywrightBrowserController(
         executable_path=env_settings.browser_executable_path,
         headless=False,  # Keep visible for testing
-        viewport_width=3840,  # 4K resolution
-        viewport_height=2160,
+        viewport_width=3840*0.65,  # 4K resolution
+        viewport_height=2160*0.65,
     )
     
     try:
