@@ -92,7 +92,7 @@ class BackgroundToggleDetector:
         return img1, img2
     
     def capture_triple_backgrounds(self, color1: str = "white", color2: str = "red",
-                                   color3: str = "green", delay: float = 0.5) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
+                                   color3: str = "blue", delay: float = 0.5) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[np.ndarray]]:
         """Capture three screenshots with different background colors for robust detection.
         
         This method is more robust against animated content (videos) by checking that
@@ -101,7 +101,7 @@ class BackgroundToggleDetector:
         Args:
             color1: First background color (e.g., "white")
             color2: Second background color (e.g., "red")
-            color3: Third background color (e.g., "green")
+            color3: Third background color (e.g., "blue")
             delay: Delay between color change and screenshot
             
         Returns:
@@ -213,7 +213,7 @@ class BackgroundToggleDetector:
         Args:
             img1: First image (white background)
             img2: Second image (red background)
-            img3: Third image (green background)
+            img3: Third image (blue background)
             threshold: Difference threshold, default 20
             
         Returns:
@@ -243,12 +243,17 @@ class BackgroundToggleDetector:
         print(f"   Both transitions: {changed_both:,} pixels changed ({changed_both/total_pixels*100:.1f}%)")
         
         # Invert to get content mask
-        content_mask = cv2.bitwise_not(background_mask)
+        content_mask_raw = cv2.bitwise_not(background_mask)
+        content_pixels_raw = np.sum(content_mask_raw > 0)
+        print(f"   Content (before cleanup): {content_pixels_raw:,} pixels ({content_pixels_raw/total_pixels*100:.1f}%)")
         
         # Clean up noise
         kernel = np.ones((3, 3), np.uint8)
-        content_mask = cv2.morphologyEx(content_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        content_mask = cv2.morphologyEx(content_mask_raw, cv2.MORPH_OPEN, kernel, iterations=1)
         content_mask = cv2.morphologyEx(content_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        
+        content_pixels_final = np.sum(content_mask > 0)
+        print(f"   Content (after cleanup): {content_pixels_final:,} pixels ({content_pixels_final/total_pixels*100:.1f}%)")
         
         print("🔍 Using robust triple-background detection (filters out video content)")
         return content_mask
@@ -265,7 +270,7 @@ class RobustTileDetector(BackgroundToggleDetector):
             min_area: Minimum tile area in pixels
             max_area: Maximum tile area in pixels
             diff_threshold: Difference threshold for background change detection (default 20)
-            use_triple: If True, use triple background (white->red->green) for robustness against videos
+            use_triple: If True, use triple background (white->red->blue) for robustness against videos
             
         Returns:
             List of tile rectangles as (x, y, width, height)
@@ -274,20 +279,36 @@ class RobustTileDetector(BackgroundToggleDetector):
         print("ROBUST TILE DETECTION (Background Toggle)")
         print("="*80)
         
+        # First, try triple background if requested
+        tiles_found = []
+        method_used = "none"
+        
         if use_triple:
             # Capture with three backgrounds for robust detection
-            img_white, img_red, img_green = self.capture_triple_backgrounds("white", "red", "green")
+            img_white, img_red, img_blue = self.capture_triple_backgrounds("white", "red", "blue")
             
-            if img_white is None or img_red is None or img_green is None:
+            if img_white is None or img_red is None or img_blue is None:
                 print("❌ Failed to capture images")
                 return []
             
             # Compute robust content mask (filters out videos)
-            content_mask = self.compute_robust_content_mask(img_white, img_red, img_green, diff_threshold)
+            content_mask = self.compute_robust_content_mask(img_white, img_red, img_blue, diff_threshold)
             img_ref = img_white  # Use white background for reference
-        else:
+            method_used = "triple"
+            
+            # Check if we have any content at all
+            content_pixels = np.sum(content_mask > 0)
+            if content_pixels == 0:
+                print("⚠️  Triple background detected 0 content pixels - falling back to dual background")
+                use_triple = False  # Fall back to simpler method
+        
+        if not use_triple:
             # Capture with two backgrounds (original method)
-            img_white, img_red = self.capture_with_backgrounds("white", "red")
+            if method_used == "triple":
+                # Already have img_white and img_red from triple capture
+                print("🔄 Using existing white and red captures for dual background method")
+            else:
+                img_white, img_red = self.capture_with_backgrounds("white", "red")
             
             if img_white is None or img_red is None:
                 print("❌ Failed to capture images")
@@ -439,7 +460,7 @@ class RobustMediaPaneDetector(BackgroundToggleDetector):
         Args:
             min_width_ratio: Minimum width as ratio of image width
             diff_threshold: Difference threshold (default 20)
-            use_triple: If True, use triple background (white->red->green) for robustness against videos
+            use_triple: If True, use triple background (white->red->blue) for robustness against videos
             
         Returns:
             Bounding box as (x, y, width, height) or None
@@ -450,14 +471,14 @@ class RobustMediaPaneDetector(BackgroundToggleDetector):
         
         if use_triple:
             # Capture with three backgrounds for robust detection
-            img_white, img_red, img_green = self.capture_triple_backgrounds("white", "red", "green")
+            img_white, img_red, img_blue = self.capture_triple_backgrounds("white", "red", "blue")
             
-            if img_white is None or img_red is None or img_green is None:
+            if img_white is None or img_red is None or img_blue is None:
                 print("❌ Failed to capture images")
                 return None
             
             # Compute robust content mask (filters out videos)
-            content_mask = self.compute_robust_content_mask(img_white, img_red, img_green, diff_threshold)
+            content_mask = self.compute_robust_content_mask(img_white, img_red, img_blue, diff_threshold)
             img_ref = img_white
         else:
             # Capture with two backgrounds (original method)
