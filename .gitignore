@@ -50,3 +50,5 @@ outputs/
 vastai_credentials.txt
 
 examples/forge/checkpoint_list.txtgrok_test_screenshots/
+debug_edges.png
+detected_tiles.txt
