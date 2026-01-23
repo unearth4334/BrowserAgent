@@ -87,7 +87,7 @@ class GrokTestApp:
                 return cv2.imread(screenshot_path)
             
             detector = RobustTileDetector(capture_func)
-            tiles = detector.detect_tiles_with_grid()
+            tiles = detector.detect_tiles_with_grid(show_diagnostic=True)
             self.detected_tiles = tiles
             
             if not tiles:

@@ -11,6 +11,8 @@ from typing import List, Tuple, Optional
 import requests
 import time
 from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 class BackgroundToggleDetector:
@@ -262,8 +264,91 @@ class BackgroundToggleDetector:
 class RobustTileDetector(BackgroundToggleDetector):
     """Detect tiles using background color toggling."""
     
+    def _show_diagnostic_plots(self, img_white, img_red, img_blue, diff_mask_1_2, diff_mask_2_3, 
+                               background_mask, content_mask, tiles, img_height, img_width, 
+                               bottom_threshold, use_triple=True):
+        """Show diagnostic plots visualizing the detection process."""
+        fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+        fig.suptitle('Tile Detection Diagnostic View', fontsize=16, fontweight='bold')
+        
+        # Row 1: Input images and difference masks
+        axes[0, 0].imshow(cv2.cvtColor(img_white, cv2.COLOR_BGR2RGB))
+        axes[0, 0].set_title('1. White Background')
+        axes[0, 0].axis('off')
+        
+        axes[0, 1].imshow(cv2.cvtColor(img_red, cv2.COLOR_BGR2RGB))
+        axes[0, 1].set_title('2. Red Background')
+        axes[0, 1].axis('off')
+        
+        if use_triple and img_blue is not None:
+            axes[0, 2].imshow(cv2.cvtColor(img_blue, cv2.COLOR_BGR2RGB))
+            axes[0, 2].set_title('3. Blue Background')
+            axes[0, 2].axis('off')
+        else:
+            axes[0, 2].text(0.5, 0.5, 'N/A\\n(Dual Mode)', ha='center', va='center', fontsize=12)
+            axes[0, 2].axis('off')
+        
+        axes[0, 3].imshow(diff_mask_1_2, cmap='hot')
+        axes[0, 3].set_title('4. White→Red Diff')
+        pixel_count_1_2 = np.sum(diff_mask_1_2 > 0)
+        pixel_pct_1_2 = (pixel_count_1_2 / (img_height * img_width)) * 100
+        axes[0, 3].text(0.02, 0.98, f'{pixel_pct_1_2:.1f}%', transform=axes[0, 3].transAxes,
+                       fontsize=10, color='white', va='top', bbox=dict(boxstyle='round', facecolor='black', alpha=0.7))
+        axes[0, 3].axis('off')
+        
+        # Row 2: Processing masks and results
+        if use_triple and diff_mask_2_3 is not None:
+            axes[1, 0].imshow(diff_mask_2_3, cmap='hot')
+            axes[1, 0].set_title('5. Red→Blue Diff')
+            pixel_count_2_3 = np.sum(diff_mask_2_3 > 0)
+            pixel_pct_2_3 = (pixel_count_2_3 / (img_height * img_width)) * 100
+            axes[1, 0].text(0.02, 0.98, f'{pixel_pct_2_3:.1f}%', transform=axes[1, 0].transAxes,
+                           fontsize=10, color='white', va='top', bbox=dict(boxstyle='round', facecolor='black', alpha=0.7))
+            axes[1, 0].axis('off')
+            
+            axes[1, 1].imshow(background_mask, cmap='hot')
+            axes[1, 1].set_title('6. Background (1→2 AND 2→3)')
+            pixel_count_bg = np.sum(background_mask > 0)
+            pixel_pct_bg = (pixel_count_bg / (img_height * img_width)) * 100
+            axes[1, 1].text(0.02, 0.98, f'{pixel_pct_bg:.1f}%', transform=axes[1, 1].transAxes,
+                           fontsize=10, color='white', va='top', bbox=dict(boxstyle='round', facecolor='black', alpha=0.7))
+            axes[1, 1].axis('off')
+        else:
+            axes[1, 0].text(0.5, 0.5, 'N/A\\n(Dual Mode)', ha='center', va='center', fontsize=12)
+            axes[1, 0].axis('off')
+            axes[1, 1].text(0.5, 0.5, 'N/A\\n(Dual Mode)', ha='center', va='center', fontsize=12)
+            axes[1, 1].axis('off')
+        
+        axes[1, 2].imshow(content_mask, cmap='gray')
+        axes[1, 2].set_title('7. Content Mask (After Morph)')
+        pixel_count_content = np.sum(content_mask > 0)
+        pixel_pct_content = (pixel_count_content / (img_height * img_width)) * 100
+        axes[1, 2].text(0.02, 0.98, f'{pixel_pct_content:.1f}%', transform=axes[1, 2].transAxes,
+                       fontsize=10, color='white', va='top', bbox=dict(boxstyle='round', facecolor='black', alpha=0.7))
+        axes[1, 2].axis('off')
+        
+        # Final result with detected tiles and filter zones
+        axes[1, 3].imshow(cv2.cvtColor(img_white, cv2.COLOR_BGR2RGB))
+        axes[1, 3].set_title(f'8. Detected Tiles ({len(tiles)})')
+        
+        # Draw bottom threshold line
+        axes[1, 3].axhline(y=bottom_threshold, color='red', linestyle='--', linewidth=2, label=f'Bottom filter (y>{bottom_threshold:.0f})')
+        
+        # Draw detected tiles
+        for x, y, w, h in tiles:
+            rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='lime', facecolor='none')
+            axes[1, 3].add_patch(rect)
+            # Add tile center marker
+            axes[1, 3].plot(x + w/2, y + h/2, 'g+', markersize=10, markeredgewidth=2)
+        
+        axes[1, 3].legend(loc='upper right', fontsize=8)
+        axes[1, 3].axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+    
     def detect_tiles(self, min_area: int = 5000, max_area: int = 200000,
-                    diff_threshold: int = 20, use_triple: bool = True) -> List[Tuple[int, int, int, int]]:
+                    diff_threshold: int = 20, use_triple: bool = True, show_diagnostic: bool = False) -> List[Tuple[int, int, int, int]]:
         """Detect tiles by toggling background color.
         
         Args:
@@ -271,6 +356,7 @@ class RobustTileDetector(BackgroundToggleDetector):
             max_area: Maximum tile area in pixels
             diff_threshold: Difference threshold for background change detection (default 20)
             use_triple: If True, use triple background (white->red->blue) for robustness against videos
+            show_diagnostic: If True, show diagnostic plots visualizing the detection process
             
         Returns:
             List of tile rectangles as (x, y, width, height)
@@ -282,6 +368,10 @@ class RobustTileDetector(BackgroundToggleDetector):
         # First, try triple background if requested
         tiles_found = []
         method_used = "none"
+        img_blue = None
+        diff_mask_1_2 = None
+        diff_mask_2_3 = None
+        background_mask = None
         
         if use_triple:
             # Capture with three backgrounds for robust detection
@@ -292,6 +382,10 @@ class RobustTileDetector(BackgroundToggleDetector):
                 return []
             
             # Compute robust content mask (filters out videos)
+            # Store intermediate masks for diagnostic display
+            diff_mask_1_2 = self.compute_difference_mask(img_white, img_red, diff_threshold)
+            diff_mask_2_3 = self.compute_difference_mask(img_red, img_blue, diff_threshold)
+            background_mask = cv2.bitwise_and(diff_mask_1_2, diff_mask_2_3)
             content_mask = self.compute_robust_content_mask(img_white, img_red, img_blue, diff_threshold)
             img_ref = img_white  # Use white background for reference
             method_used = "triple"
@@ -315,7 +409,9 @@ class RobustTileDetector(BackgroundToggleDetector):
                 return []
             
             # Compute content mask
+            diff_mask_1_2 = self.compute_difference_mask(img_white, img_red, diff_threshold)
             content_mask = self.compute_content_mask(img_white, img_red, diff_threshold)
+            background_mask = cv2.bitwise_not(content_mask)  # Inverse for dual mode
             img_ref = img_white
         
         # Find connected components
@@ -349,8 +445,9 @@ class RobustTileDetector(BackgroundToggleDetector):
                 print(f"  ✗ Region {i}: ({x}, {y}) {w}x{h} - Skipped (aspect ratio {aspect_ratio:.2f} > 5.0, likely text field)")
                 continue
             
-            # Filter out regions in bottom 15% of screen (likely prompt/input areas)
-            bottom_threshold = img_height * 0.85
+            # Filter out regions in bottom 5% of screen (likely prompt/input areas)
+            # Changed from 15% to 5% to avoid filtering out bottom row tiles
+            bottom_threshold = img_height * 0.95
             if y > bottom_threshold:
                 print(f"  ✗ Region {i}: ({x}, {y}) {w}x{h} - Skipped (y={y} > {bottom_threshold:.0f}, in bottom area)")
                 continue
@@ -364,22 +461,38 @@ class RobustTileDetector(BackgroundToggleDetector):
             print(f"  ✓ Tile {len(tiles)}: ({x}, {y}) size {w}x{h} area {area} aspect {aspect_ratio:.2f}")
         
         print(f"\n✅ Detected {len(tiles)} tiles")
+        
+        # Show diagnostic plots if requested
+        if show_diagnostic:
+            print("\n" + "="*80)
+            print("DIAGNOSTIC PLOTS")
+            print("="*80)
+            try:
+                self._show_diagnostic_plots(img_white, img_red, img_blue, diff_mask_1_2, diff_mask_2_3,
+                                           background_mask, content_mask, tiles, img_height, img_width,
+                                           bottom_threshold, use_triple)
+            except Exception as e:
+                print(f"❌ Error showing diagnostic plots: {e}")
+                import traceback
+                traceback.print_exc()
+        
         return tiles
     
     def detect_tiles_with_grid(self, spacing_tolerance: float = 0.3,
-                              diff_threshold: int = 20, use_triple: bool = True) -> List[Tuple[int, int, int, int]]:
+                              diff_threshold: int = 20, use_triple: bool = True, show_diagnostic: bool = False) -> List[Tuple[int, int, int, int]]:
         """Detect tiles with background toggle and grid extrapolation.
         
         Args:
             spacing_tolerance: Tolerance for grid spacing (0.3 = 30%)
             diff_threshold: Difference threshold (default 20)
             use_triple: If True, use triple background for robustness against videos
+            show_diagnostic: If True, show diagnostic plots
             
         Returns:
             List of tile rectangles as (x, y, width, height)
         """
         # Get initial tiles
-        initial_tiles = self.detect_tiles(diff_threshold=diff_threshold, use_triple=use_triple)
+        initial_tiles = self.detect_tiles(diff_threshold=diff_threshold, use_triple=use_triple, show_diagnostic=show_diagnostic)
         
         if len(initial_tiles) < 3:
             print("⚠️  Too few tiles for grid extrapolation")
