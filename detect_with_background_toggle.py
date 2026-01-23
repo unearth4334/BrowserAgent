@@ -146,13 +146,13 @@ class BackgroundToggleDetector:
         return img1, img2, img3
     
     def compute_difference_mask(self, img1: np.ndarray, img2: np.ndarray,
-                                threshold: int = 30) -> np.ndarray:
+                                threshold: int = 20) -> np.ndarray:
         """Compute difference between two images.
         
         Args:
             img1: First image
             img2: Second image
-            threshold: Difference threshold (0-255)
+            threshold: Difference threshold (0-255), default 20
             
         Returns:
             Binary mask where 255 = high difference (background), 0 = low difference (content)
@@ -177,13 +177,13 @@ class BackgroundToggleDetector:
         return diff_mask
     
     def compute_content_mask(self, img1: np.ndarray, img2: np.ndarray,
-                            threshold: int = 30) -> np.ndarray:
+                            threshold: int = 20) -> np.ndarray:
         """Compute mask of content (low difference regions).
         
         Args:
             img1: First image
             img2: Second image  
-            threshold: Difference threshold
+            threshold: Difference threshold, default 20
             
         Returns:
             Binary mask where 255 = content, 0 = background
@@ -200,7 +200,7 @@ class BackgroundToggleDetector:
         return content_mask
     
     def compute_robust_content_mask(self, img1: np.ndarray, img2: np.ndarray, img3: np.ndarray,
-                                   threshold: int = 30) -> np.ndarray:
+                                   threshold: int = 20) -> np.ndarray:
         """Compute robust content mask using triple background toggle.
         
         This method is more robust against animated content (videos) by requiring
@@ -214,7 +214,7 @@ class BackgroundToggleDetector:
             img1: First image (white background)
             img2: Second image (red background)
             img3: Third image (green background)
-            threshold: Difference threshold
+            threshold: Difference threshold, default 20
             
         Returns:
             Binary mask where 255 = content, 0 = background
@@ -223,12 +223,24 @@ class BackgroundToggleDetector:
         diff_mask_1_2 = self.compute_difference_mask(img1, img2, threshold)
         diff_mask_2_3 = self.compute_difference_mask(img2, img3, threshold)
         
+        # Count pixels with high difference
+        changed_1_2 = np.sum(diff_mask_1_2 > 0)
+        changed_2_3 = np.sum(diff_mask_2_3 > 0)
+        total_pixels = diff_mask_1_2.shape[0] * diff_mask_1_2.shape[1]
+        
+        print(f"📊 Difference analysis:")
+        print(f"   Transition 1→2: {changed_1_2:,} pixels changed ({changed_1_2/total_pixels*100:.1f}%)")
+        print(f"   Transition 2→3: {changed_2_3:,} pixels changed ({changed_2_3/total_pixels*100:.1f}%)")
+        
         # Background pixels should have HIGH difference in BOTH transitions
         # Content pixels should have LOW difference in BOTH transitions
         # Videos might have high difference in one but not necessarily both
         
         # Logical AND: pixel is background if it changed in BOTH transitions
         background_mask = cv2.bitwise_and(diff_mask_1_2, diff_mask_2_3)
+        
+        changed_both = np.sum(background_mask > 0)
+        print(f"   Both transitions: {changed_both:,} pixels changed ({changed_both/total_pixels*100:.1f}%)")
         
         # Invert to get content mask
         content_mask = cv2.bitwise_not(background_mask)
@@ -246,13 +258,13 @@ class RobustTileDetector(BackgroundToggleDetector):
     """Detect tiles using background color toggling."""
     
     def detect_tiles(self, min_area: int = 5000, max_area: int = 200000,
-                    diff_threshold: int = 30, use_triple: bool = True) -> List[Tuple[int, int, int, int]]:
+                    diff_threshold: int = 20, use_triple: bool = True) -> List[Tuple[int, int, int, int]]:
         """Detect tiles by toggling background color.
         
         Args:
             min_area: Minimum tile area in pixels
             max_area: Maximum tile area in pixels
-            diff_threshold: Difference threshold for background change detection
+            diff_threshold: Difference threshold for background change detection (default 20)
             use_triple: If True, use triple background (white->red->green) for robustness against videos
             
         Returns:
@@ -334,12 +346,12 @@ class RobustTileDetector(BackgroundToggleDetector):
         return tiles
     
     def detect_tiles_with_grid(self, spacing_tolerance: float = 0.3,
-                              diff_threshold: int = 30, use_triple: bool = True) -> List[Tuple[int, int, int, int]]:
+                              diff_threshold: int = 20, use_triple: bool = True) -> List[Tuple[int, int, int, int]]:
         """Detect tiles with background toggle and grid extrapolation.
         
         Args:
             spacing_tolerance: Tolerance for grid spacing (0.3 = 30%)
-            diff_threshold: Difference threshold
+            diff_threshold: Difference threshold (default 20)
             use_triple: If True, use triple background for robustness against videos
             
         Returns:
@@ -421,12 +433,12 @@ class RobustMediaPaneDetector(BackgroundToggleDetector):
     """Detect media pane using background color toggling."""
     
     def detect_bounds(self, min_width_ratio: float = 0.3, 
-                     diff_threshold: int = 30, use_triple: bool = True) -> Optional[Tuple[int, int, int, int]]:
+                     diff_threshold: int = 20, use_triple: bool = True) -> Optional[Tuple[int, int, int, int]]:
         """Detect media pane by toggling background color.
         
         Args:
             min_width_ratio: Minimum width as ratio of image width
-            diff_threshold: Difference threshold
+            diff_threshold: Difference threshold (default 20)
             use_triple: If True, use triple background (white->red->green) for robustness against videos
             
         Returns:
