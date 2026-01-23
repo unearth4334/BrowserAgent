@@ -202,7 +202,8 @@ class GrokTestApp:
             "Wait for element",
             "Get page title",
             "Go back",
-            "Reload page"
+            "Reload page",
+            "Change background color"
         ]
         
         while True:
@@ -285,6 +286,23 @@ class GrokTestApp:
         elif cmd_idx == 8:  # Reload page
             self.page.reload()
             print("✅ Page reloaded")
+        
+        elif cmd_idx == 9:  # Change background color
+            import requests
+            color = input("Enter color (hex like #ff0000 or name like 'lightblue'): ").strip()
+            if color:
+                try:
+                    response = requests.post(
+                        'http://localhost:5000/background',
+                        headers={'Content-Type': 'application/json'},
+                        json={'color': color}
+                    )
+                    if response.status_code == 200:
+                        print(f"✅ Changed background to {color}")
+                    else:
+                        print(f"❌ API error: {response.text}")
+                except Exception as e:
+                    print(f"❌ Error: {e}")
     
     def main_menu(self):
         """Display main menu and handle user input."""
