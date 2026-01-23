@@ -5,15 +5,18 @@ Interactive CLI application for testing Grok browser automation features.
 ## Features
 
 ### 1. **API Command Menu**
-Execute browser automation commands:
-- Navigate to page
-- Click button/element
-- Type text into input fields
-- Press keyboard keys (Enter, Escape, F11, etc.)
-- Wait for element to appear
-- Get page title
-- Go back/forward
-- Reload page
+Control the Chrome browser running inside the **noVNC container** via REST API:
+- **Navigate to page**: Focus address bar (Ctrl+L), type URL, press Enter
+- **Click element**: Execute JavaScript to click by selector
+- **Type text**: Send text input to the container browser
+- **Press key**: Send key combinations (Return, Escape, F11, etc.)
+- **Wait**: Simple sleep delay
+- **Get page title**: Retrieve current page title via JavaScript
+- **Go back**: Browser back navigation (Alt+Left macro)
+- **Reload page**: Refresh current page (Ctrl+R macro)
+- **Change background color**: Modify page background via Chrome DevTools Protocol
+
+**Important**: All API commands control the **noVNC container browser** at `http://localhost:6080`, not the local Playwright browser. The local browser is only used to view noVNC and capture screenshots for tile/media pane detection.
 
 ### 2. **Detect Tiles**
 - Captures screenshot of current page

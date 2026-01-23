@@ -193,17 +193,17 @@ class GrokTestApp:
         cv2.destroyAllWindows()
     
     def api_command_menu(self):
-        """Submenu for API commands."""
+        """Submenu for API commands that control the noVNC container browser."""
         api_commands = [
-            "Navigate to page",
-            "Click button",
+            "Navigate to page (focus address + type URL)",
+            "Click element (via JavaScript)",
             "Type text",
-            "Press key",
-            "Wait for element",
-            "Get page title",
-            "Go back",
-            "Reload page",
-            "Change background color"
+            "Press key combination",
+            "Wait (sleep)",
+            "Get page title (via JavaScript)",
+            "Go back (Alt+Left macro)",
+            "Reload page (Ctrl+R macro)",
+            "Change background color (DevTools API)"
         ]
         
         while True:
@@ -230,65 +230,139 @@ class GrokTestApp:
                 print("⚠️  Please enter a number")
     
     def execute_api_command(self, cmd_idx: int, cmd_name: str):
-        """Execute selected API command."""
+        """Execute selected API command using REST API to noVNC container."""
+        import requests
         print(f"\n🔧 Executing: {cmd_name}")
         
         if cmd_idx == 1:  # Navigate to page
             url = input("Enter URL: ").strip()
             if url:
-                self.page.goto(url)
-                print(f"✅ Navigated to {url}")
+                try:
+                    # Use focus_address macro + type + enter
+                    response = requests.post('http://localhost:5000/macro/focus_address', timeout=5)
+                    if response.status_code == 200:
+                        time.sleep(0.5)
+                        response = requests.post(
+                            'http://localhost:5000/type',
+                            headers={'Content-Type': 'application/json'},
+                            json={'text': url},
+                            timeout=5
+                        )
+                        if response.status_code == 200:
+                            time.sleep(0.3)
+                            response = requests.post('http://localhost:5000/macro/enter', timeout=5)
+                            if response.status_code == 200:
+                                print(f"✅ Navigated to {url}")
+                            else:
+                                print(f"❌ Failed to press Enter: {response.text}")
+                        else:
+                            print(f"❌ Failed to type URL: {response.text}")
+                    else:
+                        print(f"❌ Failed to focus address bar: {response.text}")
+                except Exception as e:
+                    print(f"❌ Error: {e}")
         
         elif cmd_idx == 2:  # Click button
             selector = input("Enter button selector (e.g., 'button', '.class', '#id'): ").strip()
             if selector:
                 try:
-                    self.page.click(selector)
-                    print(f"✅ Clicked {selector}")
+                    # Use JavaScript execution to click
+                    code = f'document.querySelector("{selector}").click()'
+                    response = requests.post(
+                        'http://localhost:5000/execute',
+                        headers={'Content-Type': 'application/json'},
+                        json={'code': code},
+                        timeout=5
+                    )
+                    if response.status_code == 200:
+                        print(f"✅ Clicked {selector}")
+                    else:
+                        print(f"❌ API error: {response.text}")
+                        self._show_api_fix_hint(response)
                 except Exception as e:
                     print(f"❌ Error: {e}")
         
         elif cmd_idx == 3:  # Type text
-            selector = input("Enter input selector: ").strip()
             text = input("Enter text to type: ").strip()
-            if selector and text:
+            if text:
                 try:
-                    self.page.fill(selector, text)
-                    print(f"✅ Typed '{text}' into {selector}")
+                    response = requests.post(
+                        'http://localhost:5000/type',
+                        headers={'Content-Type': 'application/json'},
+                        json={'text': text},
+                        timeout=5
+                    )
+                    if response.status_code == 200:
+                        print(f"✅ Typed '{text}'")
+                    else:
+                        print(f"❌ API error: {response.text}")
                 except Exception as e:
                     print(f"❌ Error: {e}")
         
         elif cmd_idx == 4:  # Press key
-            key = input("Enter key to press (e.g., 'Enter', 'Escape', 'F11'): ").strip()
+            key = input("Enter key to press (e.g., 'Return', 'Escape', 'F11'): ").strip()
             if key:
-                self.page.keyboard.press(key)
-                print(f"✅ Pressed {key}")
-        
-        elif cmd_idx == 5:  # Wait for element
-            selector = input("Enter selector to wait for: ").strip()
-            timeout = input("Enter timeout in seconds (default 30): ").strip()
-            timeout_ms = int(timeout) * 1000 if timeout else 30000
-            if selector:
                 try:
-                    self.page.wait_for_selector(selector, timeout=timeout_ms)
-                    print(f"✅ Element {selector} appeared")
+                    response = requests.post(
+                        'http://localhost:5000/keys',
+                        headers={'Content-Type': 'application/json'},
+                        json={'keys': key},
+                        timeout=5
+                    )
+                    if response.status_code == 200:
+                        print(f"✅ Pressed {key}")
+                    else:
+                        print(f"❌ API error: {response.text}")
                 except Exception as e:
-                    print(f"❌ Timeout or error: {e}")
+                    print(f"❌ Error: {e}")
+        
+        elif cmd_idx == 5:  # Wait
+            seconds = input("Enter seconds to wait (default 2): ").strip()
+            wait_time = float(seconds) if seconds else 2.0
+            print(f"⏳ Waiting {wait_time} seconds...")
+            time.sleep(wait_time)
+            print(f"✅ Waited {wait_time} seconds")
         
         elif cmd_idx == 6:  # Get page title
-            title = self.page.title()
-            print(f"📄 Page title: {title}")
+            try:
+                code = 'document.title'
+                response = requests.post(
+                    'http://localhost:5000/execute',
+                    headers={'Content-Type': 'application/json'},
+                    json={'code': code},
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    title = result.get('result', {}).get('value', 'N/A')
+                    print(f"📄 Page title: {title}")
+                else:
+                    print(f"❌ API error: {response.text}")
+                    self._show_api_fix_hint(response)
+            except Exception as e:
+                print(f"❌ Error: {e}")
         
         elif cmd_idx == 7:  # Go back
-            self.page.go_back()
-            print("✅ Went back")
+            try:
+                response = requests.post('http://localhost:5000/macro/back', timeout=5)
+                if response.status_code == 200:
+                    print("✅ Went back")
+                else:
+                    print(f"❌ API error: {response.text}")
+            except Exception as e:
+                print(f"❌ Error: {e}")
         
         elif cmd_idx == 8:  # Reload page
-            self.page.reload()
-            print("✅ Page reloaded")
+            try:
+                response = requests.post('http://localhost:5000/macro/refresh', timeout=5)
+                if response.status_code == 200:
+                    print("✅ Page reloaded")
+                else:
+                    print(f"❌ API error: {response.text}")
+            except Exception as e:
+                print(f"❌ Error: {e}")
         
         elif cmd_idx == 9:  # Change background color
-            import requests
             color = input("Enter color (hex like #ff0000 or name like 'lightblue'): ").strip()
             if color:
                 try:
@@ -301,15 +375,8 @@ class GrokTestApp:
                     if response.status_code == 200:
                         print(f"✅ Changed background to {color}")
                     else:
-                        error_text = response.text
-                        print(f"❌ API error: {error_text}")
-                        
-                        # Check for common remote-allow-origins error
-                        if 'remote-allow-origins' in error_text.lower() or '403' in str(response.status_code):
-                            print("\n⚠️  Chrome needs --remote-allow-origins flag")
-                            print("To fix this, Chrome must be launched with:")
-                            print("  --remote-allow-origins=* or --remote-allow-origins=http://localhost:9222")
-                            print("\nIf using Docker, add this to Chrome launch args in your Dockerfile/compose file.")
+                        print(f"❌ API error: {response.text}")
+                        self._show_api_fix_hint(response)
                         
                 except requests.exceptions.ConnectionError:
                     print("❌ Cannot connect to API server at http://localhost:5000")
@@ -318,6 +385,17 @@ class GrokTestApp:
                     print("❌ API request timed out")
                 except Exception as e:
                     print(f"❌ Error: {e}")
+    
+    def _show_api_fix_hint(self, response):
+        """Show hint for common API errors."""
+        error_text = response.text
+        # Check for common remote-allow-origins error
+        if 'remote-allow-origins' in error_text.lower() or '403' in str(response.status_code):
+            print("\n⚠️  Chrome needs --remote-allow-origins flag")
+            print("To fix this, Chrome must be launched with:")
+            print("  --remote-allow-origins=* or --remote-allow-origins=http://localhost:9222")
+            print("\nIf using Docker, add this to Chrome launch args in your Dockerfile/compose file.")
+            print("See CHROME_DEVTOOLS_FIX.md for detailed instructions.")
     
     def main_menu(self):
         """Display main menu and handle user input."""
