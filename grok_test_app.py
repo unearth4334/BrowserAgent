@@ -295,12 +295,27 @@ class GrokTestApp:
                     response = requests.post(
                         'http://localhost:5000/background',
                         headers={'Content-Type': 'application/json'},
-                        json={'color': color}
+                        json={'color': color},
+                        timeout=5
                     )
                     if response.status_code == 200:
                         print(f"✅ Changed background to {color}")
                     else:
-                        print(f"❌ API error: {response.text}")
+                        error_text = response.text
+                        print(f"❌ API error: {error_text}")
+                        
+                        # Check for common remote-allow-origins error
+                        if 'remote-allow-origins' in error_text.lower() or '403' in str(response.status_code):
+                            print("\n⚠️  Chrome needs --remote-allow-origins flag")
+                            print("To fix this, Chrome must be launched with:")
+                            print("  --remote-allow-origins=* or --remote-allow-origins=http://localhost:9222")
+                            print("\nIf using Docker, add this to Chrome launch args in your Dockerfile/compose file.")
+                        
+                except requests.exceptions.ConnectionError:
+                    print("❌ Cannot connect to API server at http://localhost:5000")
+                    print("   Make sure the Docker container is running")
+                except requests.exceptions.Timeout:
+                    print("❌ API request timed out")
                 except Exception as e:
                     print(f"❌ Error: {e}")
     
