@@ -160,8 +160,8 @@ class GrokTestApp:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     
-    def click_tile(self, tile_index: int):
-        """Click on a tile by index."""
+    def click_tile(self, tile_index: int, api_url: str = "http://localhost:5000"):
+        """Click on a tile by index using JavaScript via API."""
         if not self.detected_tiles:
             print("⚠️  No tiles detected. Run 'Detect tiles' first.")
             return
@@ -170,21 +170,49 @@ class GrokTestApp:
             print(f"⚠️  Invalid tile index. Must be between 1 and {len(self.detected_tiles)}")
             return
         
-        # Use tile_metadata for DOM coordinates if available (HTML detection)
-        if hasattr(self, 'tile_metadata') and self.tile_metadata:
-            tile = self.tile_metadata[tile_index - 1]
-            # Use raw HTML coordinates with viewport offset (no scaling for Playwright)
-            center_x = 118 + tile['left'] + tile['width'] // 2
-            center_y = 49 + tile['top'] + 340  # tile_height / 2
-            print(f"🖱️  Clicking tile {tile_index} at DOM coords ({center_x}, {center_y})")
-        else:
-            # Fallback to visual detection coordinates (already in screen space)
-            x, y, w, h = self.detected_tiles[tile_index - 1]
-            center_x = x + w // 2
-            center_y = y + h // 2
-            print(f"🖱️  Clicking tile {tile_index} at ({center_x}, {center_y})")
+        print(f"🖱️  Clicking tile {tile_index} using JavaScript...")
         
-        self.page.mouse.click(center_x, center_y)
+        # Use JavaScript to click the tile directly in the DOM
+        # Tiles are identified by role='listitem' and we select by index (0-based)
+        js_code = f"""
+        (function() {{
+            const tiles = document.querySelectorAll('[role="listitem"]');
+            if (tiles.length >= {tile_index}) {{
+                const tile = tiles[{tile_index - 1}];
+                tile.click();
+                return {{success: true, index: {tile_index}, total: tiles.length}};
+            }} else {{
+                return {{success: false, error: 'Tile not found', total: tiles.length}};
+            }}
+        }})();
+        """
+        
+        try:
+            import requests
+            response = requests.post(
+                f"{api_url}/execute",
+                json={"code": js_code},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                result = data.get('result', {})
+                
+                # Extract the returned value
+                if result.get('type') == 'object' and 'value' in result:
+                    result_value = result['value']
+                    if isinstance(result_value, dict) and result_value.get('success'):
+                        print(f"✅ Tile {tile_index} clicked successfully")
+                    else:
+                        print(f"⚠️  Click result: {result_value}")
+                else:
+                    print(f"✅ Click executed")
+            else:
+                print(f"❌ API error: HTTP {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error clicking tile: {e}")
+        
         time.sleep(0.5)
         print("✅ Click completed")
 
