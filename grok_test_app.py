@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 import cv2
 import numpy as np
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 
 from playwright.sync_api import sync_playwright, Page, Browser
 from detect_grok_tiles import TileDetector
