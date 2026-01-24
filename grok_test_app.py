@@ -164,11 +164,20 @@ class GrokTestApp:
             print(f"⚠️  Invalid tile index. Must be between 1 and {len(self.detected_tiles)}")
             return
         
-        x, y, w, h = self.detected_tiles[tile_index - 1]
-        center_x = x + w // 2
-        center_y = y + h // 2
+        # Use tile_metadata for DOM coordinates if available (HTML detection)
+        if hasattr(self, 'tile_metadata') and self.tile_metadata:
+            tile = self.tile_metadata[tile_index - 1]
+            # Use raw HTML coordinates with viewport offset (no scaling for Playwright)
+            center_x = 118 + tile['left'] + tile['width'] // 2
+            center_y = 49 + tile['top'] + 340  # tile_height / 2
+            print(f"🖱️  Clicking tile {tile_index} at DOM coords ({center_x}, {center_y})")
+        else:
+            # Fallback to visual detection coordinates (already in screen space)
+            x, y, w, h = self.detected_tiles[tile_index - 1]
+            center_x = x + w // 2
+            center_y = y + h // 2
+            print(f"🖱️  Clicking tile {tile_index} at ({center_x}, {center_y})")
         
-        print(f"🖱️  Clicking tile {tile_index} at ({center_x}, {center_y})")
         self.page.mouse.click(center_x, center_y)
         time.sleep(0.5)
         print("✅ Click completed")
