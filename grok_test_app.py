@@ -872,6 +872,7 @@ class GrokTestApp:
             print("  7. Detect Media Pane (Traditional)")
             print("  8. Detect Media Pane (Robust - Background Toggle)")
             print("  9. Capture Screenshot")
+            print(" 10. Clear Tile Hash Database")
             print("  0. Exit")
             print("="*80)
             
@@ -921,6 +922,18 @@ class GrokTestApp:
                 if not filename:
                     filename = "screenshot.png"
                 self.capture_screenshot(filename)
+            
+            elif choice == "10":
+                print("\n⚠️  WARNING: This will delete all tile hash data!")
+                confirm = input("Are you sure? (yes/no): ").strip().lower()
+                if confirm == "yes":
+                    self.tile_db.clear_database()
+                    stats = self.tile_db.get_stats()
+                    print(f"\n✅ Database cleared!")
+                    print(f"   Total tiles: {stats['total_tiles']}")
+                    print(f"   Total scans: {stats['total_scans']}")
+                else:
+                    print("\n❌ Clear cancelled")
             
             else:
                 print("⚠️  Invalid choice")

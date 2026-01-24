@@ -284,6 +284,13 @@ class TileHashDatabase:
             'total_scans': scans
         }
     
+    def clear_database(self):
+        """Clear all data from the database (tiles and scan history)."""
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM tiles")
+        cursor.execute("DELETE FROM scan_history")
+        self.conn.commit()
+    
     def close(self):
         """Close database connection."""
         self.conn.close()
