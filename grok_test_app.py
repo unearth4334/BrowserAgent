@@ -250,35 +250,16 @@ class GrokTestApp:
         
         print(f"🖱️  Clicking tile {tile_index} using JavaScript...")
         
-        # Use JavaScript to click the tile directly in the DOM
-        # Tiles are identified by role='listitem' and we select by index (0-based)
+        # Try multiple click approaches to ensure it works
+        # 1. Try clicking the anchor/link child element
+        # 2. Try dispatching a proper click event
+        # 3. Try clicking the tile itself
         js_code = f"""
         (function() {{
             const tiles = document.querySelectorAll('[role="listitem"]');
             console.log('Total tiles found:', tiles.length);
-            console.log('Attempting to click tile index:', {tile_index - 1});
             
-            if (tiles.length >= {tile_index}) {{
-                const tile = tiles[{tile_index - 1}];
-                const rect = tile.getBoundingClientRect();
-                console.log('Tile rect:', rect);
-                console.log('Tile visible:', rect.width > 0 && rect.height > 0);
-                
-                tile.click();
-                console.log('Click executed on tile', {tile_index});
-                
-                return {{
-                    success: true,
-                    index: {tile_index},
-                    total: tiles.length,
-                    rect: {{
-                        x: Math.round(rect.x),
-                        y: Math.round(rect.y),
-                        width: Math.round(rect.width),
-                        height: Math.round(rect.height)
-                    }}
-                }};
-            }} else {{
+            if (tiles.length < {tile_index}) {{
                 console.error('Tile not found! Requested:', {tile_index}, 'Available:', tiles.length);
                 return {{
                     success: false,
@@ -287,6 +268,58 @@ class GrokTestApp:
                     total: tiles.length
                 }};
             }}
+            
+            const tile = tiles[{tile_index - 1}];
+            const rect = tile.getBoundingClientRect();
+            
+            // Scroll tile into view first
+            tile.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+            
+            // Try to find clickable child element (link or button)
+            let clickTarget = tile.querySelector('a') || tile.querySelector('button') || tile;
+            
+            console.log('Click target tagName:', clickTarget.tagName);
+            console.log('Click target href:', clickTarget.href || 'N/A');
+            
+            // Dispatch proper mouse events
+            const mousedownEvent = new MouseEvent('mousedown', {{
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }});
+            const mouseupEvent = new MouseEvent('mouseup', {{
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }});
+            const clickEvent = new MouseEvent('click', {{
+                bubbles: true,
+                cancelable: true,
+                view: window
+            }});
+            
+            clickTarget.dispatchEvent(mousedownEvent);
+            clickTarget.dispatchEvent(mouseupEvent);
+            clickTarget.dispatchEvent(clickEvent);
+            
+            // Also try direct click as fallback
+            clickTarget.click();
+            
+            console.log('Click events dispatched on tile', {tile_index});
+            
+            return {{
+                success: true,
+                index: {tile_index},
+                total: tiles.length,
+                clickTarget: clickTarget.tagName,
+                hasHref: !!clickTarget.href,
+                rect: {{
+                    x: Math.round(rect.x),
+                    y: Math.round(rect.y),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height)
+                }}
+            }};
         }})();
         """
         
@@ -311,6 +344,8 @@ class GrokTestApp:
                     if isinstance(result_value, dict):
                         if result_value.get('success'):
                             print(f"✅ Tile {tile_index} clicked successfully")
+                            print(f"   Click target: {result_value.get('clickTarget', 'unknown')}")
+                            print(f"   Has href: {result_value.get('hasHref', False)}")
                             if 'rect' in result_value:
                                 rect = result_value['rect']
                                 print(f"   Position: ({rect['x']}, {rect['y']})")
