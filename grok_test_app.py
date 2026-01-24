@@ -281,55 +281,64 @@ class GrokTestApp:
         print(f"Total tiles found: {len(tiles)}")
         print("Strategy: Stop at 3 consecutive unchanged tiles")
         
-        # First, compute hashes for all tiles
-        print("\n🔑 Computing tile hashes...")
+        # Compute hashes incrementally and check for stop condition
+        print("\n🔑 Computing tile hashes incrementally...")
         tile_hashes = []
+        stop_pos = None
+        required_consecutive = 3
         
         for idx, tile in enumerate(tiles, 1):
             url = tile.get('thumbnail_url')
             if not url:
                 tile_hashes.append(None)
                 print(f"  Tile {idx}: No thumbnail URL")
-                continue
-            
-            try:
-                resp = requests.post(
-                    f"{api_url}/fetch-image",
-                    json={"url": url},
-                    timeout=20
-                )
-                
-                if resp.status_code == 200:
-                    data = resp.json()
-                    if data.get('status') == 'ok' and 'data' in data:
-                        img_bytes = base64.b64decode(data['data'])
-                        tile_hash = self.tile_db.compute_tile_hash(img_bytes)
-                        tile_hashes.append(tile_hash)
-                        print(f"  Tile {idx}: {tile_hash}")
+            else:
+                try:
+                    resp = requests.post(
+                        f"{api_url}/fetch-image",
+                        json={"url": url},
+                        timeout=20
+                    )
+                    
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get('status') == 'ok' and 'data' in data:
+                            img_bytes = base64.b64decode(data['data'])
+                            tile_hash = self.tile_db.compute_tile_hash(img_bytes)
+                            tile_hashes.append(tile_hash)
+                            print(f"  Tile {idx}: {tile_hash}")
+                        else:
+                            tile_hashes.append(None)
+                            print(f"  Tile {idx}: API error")
                     else:
                         tile_hashes.append(None)
-                        print(f"  Tile {idx}: API error")
-                else:
+                        print(f"  Tile {idx}: HTTP {resp.status_code}")
+                except Exception as e:
                     tile_hashes.append(None)
-                    print(f"  Tile {idx}: HTTP {resp.status_code}")
-            except Exception as e:
-                tile_hashes.append(None)
-                print(f"  Tile {idx}: Error - {e}")
+                    print(f"  Tile {idx}: Error - {e}")
+            
+            # Check if we have enough hashes to check for stop condition
+            if idx >= required_consecutive:
+                # Check if we found N consecutive unchanged tiles
+                for start_pos in range(1, idx - required_consecutive + 2):
+                    if self.tile_db.check_consecutive_unchanged(tile_hashes, start_pos, required_consecutive):
+                        stop_pos = start_pos + required_consecutive - 1
+                        print(f"\n✋ Found {required_consecutive} consecutive unchanged tiles!")
+                        print(f"   Stopping at position {stop_pos} (tiles 1-{stop_pos} processed)")
+                        break
+                
+                if stop_pos:
+                    break
             
             # 2 second delay between requests
             if idx < len(tiles):
                 time.sleep(2)
         
-        # Find stop position (use all hashes including None)
-        stop_pos = self.tile_db.find_stop_position(tile_hashes, required_consecutive=3)
+        if not stop_pos:
+            print(f"\n📝 No stopping point found, processed all {len(tile_hashes)} tiles")
+            stop_pos = len(tile_hashes)
         
-        if stop_pos:
-            print(f"\n✋ Found 3 consecutive unchanged tiles")
-            print(f"   Stopping at position {stop_pos} (tiles 1-{stop_pos} processed)")
-            tiles_to_process = stop_pos
-        else:
-            print(f"\n📝 No stopping point found, processing all {len(tiles)} tiles")
-            tiles_to_process = len(tiles)
+        tiles_to_process = stop_pos
         
         # Process new/modified tiles
         print(f"\n🔄 Updating database...")
