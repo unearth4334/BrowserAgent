@@ -15,6 +15,8 @@ from playwright.sync_api import sync_playwright, Page, Browser
 from detect_grok_tiles import TileDetector
 from detect_widest_region import WidestRegionDetector
 from detect_with_background_toggle import RobustTileDetector, RobustMediaPaneDetector
+from detect_tiles_from_html import detect_tiles_from_html
+from visualize_html_detection import visualize_html_detection
 
 
 class GrokTestApp:
@@ -441,6 +443,107 @@ class GrokTestApp:
             print("\nIf using Docker, add this to Chrome launch args in your Dockerfile/compose file.")
             print("See CHROME_DEVTOOLS_FIX.md for detailed instructions.")
     
+    def detect_tiles_html(self):
+        """Detect tiles using HTML parsing with scaling support."""
+        print("\n" + "="*80)
+        print("HTML-BASED TILE DETECTION")
+        print("="*80)
+        
+        try:
+            # Get viewport offset and scale
+            print("\nViewport offset and scale configuration:")
+            print("  Calibrated defaults: offset=(118, 49), scale=0.75 (for 133% zoom)")
+            use_defaults = input("Use calibrated defaults? (y/n): ").strip().lower()
+            
+            if use_defaults == 'y':
+                viewport_offset = (118, 49)
+                scale_factor = (0.75, 0.75)
+            else:
+                try:
+                    x_offset = int(input("Enter X offset [118]: ") or "118")
+                    y_offset = int(input("Enter Y offset [49]: ") or "49")
+                    viewport_offset = (x_offset, y_offset)
+                    
+                    x_scale = float(input("Enter X scale [0.75]: ") or "0.75")
+                    y_scale = float(input("Enter Y scale [0.75]: ") or "0.75")
+                    scale_factor = (x_scale, y_scale)
+                except ValueError:
+                    print("⚠️ Invalid values, using calibrated defaults")
+                    viewport_offset = (118, 49)
+                    scale_factor = (0.75, 0.75)
+            
+            print(f"Using: offset={viewport_offset}, scale={scale_factor}")
+            
+            # Ask if user wants visualization
+            show_viz = input("\nCreate visualization overlay? (y/n): ").strip().lower()
+            
+            if show_viz == 'y':
+                # Use the visualization function which does everything
+                visualize_html_detection(
+                    api_url="http://localhost:5000",
+                    viewport_offset=viewport_offset,
+                    scale_factor=scale_factor,
+                    tile_height=680,
+                    screenshot_path="temp_screenshot.png",
+                    output_path="html_detection_overlay.png",
+                    show_image=True
+                )
+                # The visualization function already stores tiles, but we need to get them
+                from detect_tiles_from_html import detect_tiles_from_html
+                rectangles, tiles = detect_tiles_from_html(
+                    api_url="http://localhost:5000",
+                    viewport_offset=viewport_offset,
+                    scale_factor=scale_factor,
+                    tile_height=680
+                )
+                self.detected_tiles = rectangles
+            else:
+                # Run HTML-based detection without visualization
+                print("\n🌐 Fetching page source and parsing tiles...")
+                rectangles, tiles = detect_tiles_from_html(
+                    api_url="http://localhost:5000",
+                    viewport_offset=viewport_offset,
+                    scale_factor=scale_factor,
+                    tile_height=680
+                )
+                
+                if rectangles:
+                    self.detected_tiles = rectangles
+                    print(f"\n✅ Successfully detected {len(rectangles)} tiles")
+                    
+                    # Show summary by column
+                    print("\n📊 Tile Layout:")
+                    columns = {}
+                    for rect, tile in zip(rectangles, tiles):
+                        left = tile['left']
+                        if left not in columns:
+                            columns[left] = []
+                        columns[left].append((rect, tile))
+                    
+                    for col_num, left_val in enumerate(sorted(columns.keys()), 1):
+                        items = columns[left_val]
+                        video_count = sum(1 for _, t in items if t['has_video'])
+                        print(f"  Column {col_num} (x={left_val}px): {len(items)} tiles ({video_count} with video)")
+                    
+                    # Show first few tiles
+                    print("\n🔍 Sample tiles (first 5):")
+                    for i, (rect, tile) in enumerate(zip(rectangles[:5], tiles[:5]), 1):
+                        x, y, w, h = rect
+                        video_marker = "[VIDEO]" if tile['has_video'] else "[IMAGE]"
+                        print(f"  {i}. Screen: ({x}, {y}) {w}x{h}  HTML: ({tile['left']}, {tile['top']})  {video_marker}")
+                    
+                    if len(rectangles) > 5:
+                        print(f"  ... and {len(rectangles) - 5} more")
+                        
+                    print("\n💡 Tiles stored in memory for clicking")
+                else:
+                    print("\n❌ No tiles detected")
+        
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def main_menu(self):
         """Display main menu and handle user input."""
         while True:
@@ -450,11 +553,12 @@ class GrokTestApp:
             print("  1. API Command")
             print("  2. Detect Tiles (Traditional)")
             print("  3. Detect Tiles (Robust - Background Toggle)")
-            print("  4. Click Tile")
-            print("  5. Detect Media Pane (Traditional)")
-            print("  6. Detect Media Pane (Robust - Background Toggle)")
-            print("  7. Capture Screenshot")
-            print("  8. Open Grok (navigate to Grok)")
+            print("  4. Detect Tiles (HTML-based)")
+            print("  5. Click Tile")
+            print("  6. Detect Media Pane (Traditional)")
+            print("  7. Detect Media Pane (Robust - Background Toggle)")
+            print("  8. Capture Screenshot")
+            print("  9. Open Grok (navigate to Grok)")
             print("  0. Exit")
             print("="*80)
             
@@ -474,6 +578,9 @@ class GrokTestApp:
                 self.detect_and_display_tiles(use_robust=True)
             
             elif choice == "4":
+                self.detect_tiles_html()
+            
+            elif choice == "5":
                 if not self.detected_tiles:
                     print("⚠️  No tiles detected. Run 'Detect tiles' first.")
                 else:
@@ -484,19 +591,19 @@ class GrokTestApp:
                     except ValueError:
                         print("⚠️  Please enter a valid number")
             
-            elif choice == "5":
+            elif choice == "6":
                 self.detect_and_display_media_pane(use_robust=False)
             
-            elif choice == "6":
+            elif choice == "7":
                 self.detect_and_display_media_pane(use_robust=True)
             
-            elif choice == "7":
+            elif choice == "8":
                 filename = input("Enter filename (default: screenshot.png): ").strip()
                 if not filename:
                     filename = "screenshot.png"
                 self.capture_screenshot(filename)
             
-            elif choice == "8":
+            elif choice == "9":
                 grok_url = input("Enter Grok URL (default: https://grok.x.com): ").strip()
                 if not grok_url:
                     grok_url = "https://grok.x.com"

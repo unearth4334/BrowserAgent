@@ -53,3 +53,11 @@ vastai_credentials.txt
 examples/forge/checkpoint_list.txtgrok_test_screenshots/
 debug_edges.png
 detected_tiles.txt
+
+# HTML detection temporary files
+temp_screenshot.png
+aligned_detection.png
+html_detection_overlay.png
+page_source_*.html
+parsed_listitems_*.json
+html_detection_results.json
