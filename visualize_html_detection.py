@@ -47,7 +47,8 @@ def draw_tile_overlays(
     image_path: str,
     rectangles: list,
     tiles: list,
-    output_path: str = "html_detection_overlay.png"
+    output_path: str = "html_detection_overlay.png",
+    labels: list | None = None
 ) -> str:
     """
     Draw detection results on the screenshot.
@@ -113,6 +114,24 @@ def draw_tile_overlays(
         pos_text = f"({tile['left']}, {tile['top']})"
         cv2.putText(overlay, pos_text, (x + 8, y + h - 10),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLOR_TEXT, 1)
+
+        # Draw hash label in center if provided
+        if labels and i-1 < len(labels) and labels[i-1]:
+            hash_text = labels[i-1]
+            (ht_w, ht_h), _ = cv2.getTextSize(hash_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+            cx = x + w // 2
+            cy = y + h // 2
+            # Background box centered
+            bg_x1 = cx - ht_w // 2 - 6
+            bg_y1 = cy - ht_h // 2 - 6
+            bg_x2 = cx + ht_w // 2 + 6
+            bg_y2 = cy + ht_h // 2 + 6
+            cv2.rectangle(overlay, (bg_x1, bg_y1), (bg_x2, bg_y2), COLOR_TEXT_BG, -1)
+            # Centered text
+            text_x = cx - ht_w // 2
+            text_y = cy + ht_h // 2 - 4
+            cv2.putText(overlay, hash_text, (text_x, text_y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
     
     # Add legend
     legend_y = 30
@@ -199,8 +218,36 @@ def visualize_html_detection(
     
     print(f"✅ Detected {len(rectangles)} tiles")
     
-    # Step 3: Draw overlays
-    result_path = draw_tile_overlays(screenshot, rectangles, tiles, output_path)
+    # Step 3: Compute thumbnail hashes with 2s delay between fetches
+    import time
+    import hashlib
+    import base64
+    hashes: list[str] = []
+    print("\n🔑 Computing thumbnail hashes (SHA-256)...")
+    for idx, tile in enumerate(tiles, 1):
+        url = tile.get('thumbnail_url')
+        if not url:
+            hashes.append("N/A")
+            continue
+        try:
+            resp = requests.post(f"{api_url}/fetch-image", json={"url": url}, timeout=20)
+            if resp.status_code == 200:
+                payload = resp.json()
+                if payload.get('status') == 'ok' and 'data' in payload:
+                    img_bytes = base64.b64decode(payload['data'])
+                    h = hashlib.sha256(img_bytes).hexdigest()[:12]
+                    hashes.append(h)
+                else:
+                    hashes.append("ERR")
+            else:
+                hashes.append("HTTP")
+        except requests.RequestException:
+            hashes.append("NET")
+        # Respect 2 second delay to avoid crashing the server
+        time.sleep(2)
+
+    # Step 4: Draw overlays with hash labels
+    result_path = draw_tile_overlays(screenshot, rectangles, tiles, output_path, labels=hashes)
     
     if result_path and show_image:
         # Display the result
