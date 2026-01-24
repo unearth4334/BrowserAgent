@@ -198,26 +198,39 @@ class GrokTestApp:
                 return
 
             print("📄 Analyzing HTML for video indicators...")
-            patterns = [
-                r"<video\b",
-                r'aria-label\s*=\s*"?video"?',
-                r">\s*video\s*<",
-                r"video</span>",
-                r'data-icon\s*=\s*"?video"?',
-                r'role\s*=\s*"img"[^>]*aria-label\s*=\s*"[^"]*video',
-                r'source[^>]+src=\\?"[^"]+\.(mp4|webm)'
-            ]
-
-            found = False
-            for pat in patterns:
-                if re.search(pat, html, flags=re.IGNORECASE):
-                    print(f"   ✅ Match: {pat}")
-                    found = True
             
-            if found:
-                print("\n🎬 Video component likely present")
+            # Primary indicators (strong signals)
+            primary_patterns = {
+                'video_tag': r"<video\b[^>]*>",
+                'video_source': r'<source[^>]+src\s*=\s*"[^"]+\.(mp4|webm)',
+            }
+            
+            # Secondary indicators (need context from primary)
+            secondary_patterns = {
+                'svg_video_icon': r'<svg[^>]*>\s*<use[^>]*xlink:href\s*=\s*"[^"]*video',
+                'video_button': r'<button[^>]*aria-label\s*=\s*"[^"]*video[^"]*play',
+            }
+            
+            primary_matches = []
+            secondary_matches = []
+            
+            for name, pat in primary_patterns.items():
+                if re.search(pat, html, flags=re.IGNORECASE):
+                    print(f"   ✅ Primary match: {name}")
+                    primary_matches.append(name)
+            
+            for name, pat in secondary_patterns.items():
+                if re.search(pat, html, flags=re.IGNORECASE):
+                    print(f"   ℹ️  Secondary match: {name}")
+                    secondary_matches.append(name)
+            
+            # Decision logic: need at least one primary match
+            if primary_matches:
+                print("\n🎬 Video component detected")
+            elif secondary_matches:
+                print("\n⚠️  Video indicators found but no video element")
             else:
-                print("\n🖼️  No video indicator found")
+                print("\n🖼️  No video component found")
 
         except Exception as e:
             print(f"\n❌ Error: {e}")
