@@ -157,7 +157,7 @@ class TileHashDatabase:
     
     def check_consecutive_unchanged(
         self,
-        tile_hashes: List[str],
+        tile_hashes: List[Optional[str]],
         start_position: int,
         required_consecutive: int = 3
     ) -> bool:
@@ -165,7 +165,7 @@ class TileHashDatabase:
         Check if N consecutive tiles exist in DB and are in same relative order.
         
         Args:
-            tile_hashes: List of current tile hashes in order
+            tile_hashes: List of current tile hashes in order (may contain None)
             start_position: 1-based position to start checking from
             required_consecutive: Number of consecutive unchanged tiles needed
             
@@ -180,28 +180,29 @@ class TileHashDatabase:
         # Get the consecutive tiles to check
         check_hashes = tile_hashes[start_position - 1:start_position + required_consecutive - 1]
         
-        # Get their previous positions from DB
-        placeholders = ','.join('?' * len(check_hashes))
-        cursor.execute(
-            f"SELECT hash, position FROM tiles WHERE hash IN ({placeholders}) ORDER BY position",
-            check_hashes
-        )
-        
-        db_tiles = cursor.fetchall()
-        
-        # Need all tiles to exist
-        if len(db_tiles) != required_consecutive:
+        # Skip if any are None (missing hash)
+        if any(h is None for h in check_hashes):
             return False
         
-        # Check if they're in the same relative order
-        db_hashes = [row['hash'] for row in db_tiles]
+        # Check each tile individually to ensure they exist at consecutive positions
+        for i, tile_hash in enumerate(check_hashes):
+            expected_position = start_position + i
+            
+            cursor.execute(
+                "SELECT position FROM tiles WHERE hash = ?",
+                (tile_hash,)
+            )
+            result = cursor.fetchone()
+            
+            # Tile must exist and be at the expected position
+            if not result or result['position'] != expected_position:
+                return False
         
-        # They should match the order in check_hashes
-        return db_hashes == check_hashes
+        return True
     
     def find_stop_position(
         self,
-        tile_hashes: List[str],
+        tile_hashes: List[Optional[str]],
         required_consecutive: int = 3
     ) -> Optional[int]:
         """
@@ -212,14 +213,15 @@ class TileHashDatabase:
             required_consecutive: Number of consecutive unchanged tiles to find
             
         Returns:
-            1-based position where to stop, or None if should process all
+            1-based position where to stop (after the consecutive unchanged tiles),
+            or None if should process all tiles
         """
-        # Check each position starting from required_consecutive
-        for pos in range(required_consecutive, len(tile_hashes) + 1):
-            start_pos = pos - required_consecutive + 1
+        # Check starting from position 1
+        for start_pos in range(1, len(tile_hashes) - required_consecutive + 2):
             if self.check_consecutive_unchanged(tile_hashes, start_pos, required_consecutive):
-                # Stop before these unchanged tiles
-                return start_pos - 1
+                # Found N consecutive unchanged tiles starting at start_pos
+                # Stop after them (at position start_pos + required_consecutive - 1)
+                return start_pos + required_consecutive - 1
         
         return None  # Process all tiles
     

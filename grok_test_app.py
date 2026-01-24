@@ -320,13 +320,12 @@ class GrokTestApp:
             if idx < len(tiles):
                 time.sleep(2)
         
-        # Find stop position
-        valid_hashes = [h for h in tile_hashes if h is not None]
-        stop_pos = self.tile_db.find_stop_position(valid_hashes, required_consecutive=3)
+        # Find stop position (use all hashes including None)
+        stop_pos = self.tile_db.find_stop_position(tile_hashes, required_consecutive=3)
         
         if stop_pos:
-            print(f"\n✋ Found 3 consecutive unchanged tiles at position {stop_pos + 1}")
-            print(f"   Processing tiles 1-{stop_pos}")
+            print(f"\n✋ Found 3 consecutive unchanged tiles")
+            print(f"   Stopping at position {stop_pos} (tiles 1-{stop_pos} processed)")
             tiles_to_process = stop_pos
         else:
             print(f"\n📝 No stopping point found, processing all {len(tiles)} tiles")
