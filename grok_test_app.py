@@ -677,8 +677,12 @@ class GrokTestApp:
             # Ask if user wants visualization
             show_viz = input("\nCreate visualization overlay? (y/n): ").strip().lower()
             
+            # Ask about hash scanning first (to avoid duplicate computation)
+            use_hash_scan = input("Use intelligent hash-based scanning? (y/n): ").strip().lower()
+            
             if show_viz == 'y':
-                # Use the visualization function which does everything
+                # Skip hash computation in visualization if we're doing intelligent scanning
+                # (to avoid computing hashes twice)
                 visualize_html_detection(
                     api_url="http://localhost:5000",
                     viewport_offset=viewport_offset,
@@ -686,7 +690,8 @@ class GrokTestApp:
                     tile_height=680,
                     screenshot_path="temp_screenshot.png",
                     output_path="html_detection_overlay.png",
-                    show_image=True
+                    show_image=True,
+                    compute_hashes=(use_hash_scan != 'y')  # Skip if using intelligent scan
                 )
                 # The visualization function already stores tiles, but we need to get them
                 from detect_tiles_from_html import detect_tiles_from_html
@@ -699,8 +704,7 @@ class GrokTestApp:
                 self.detected_tiles = rectangles
                 self.tile_metadata = tiles  # Store full tile data for thumbnails
                 
-                # Ask if user wants hash-based scanning
-                use_hash_scan = input("\nUse intelligent hash-based scanning? (y/n): ").strip().lower()
+                # Do hash-based scanning if requested
                 if use_hash_scan == 'y' and tiles:
                     self.scan_tiles_with_hash_detection(
                         tiles, viewport_offset, scale_factor, "http://localhost:5000"

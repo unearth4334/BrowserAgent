@@ -179,7 +179,8 @@ def visualize_html_detection(
     tile_height: int = 680,
     screenshot_path: str = "temp_screenshot.png",
     output_path: str = "html_detection_overlay.png",
-    show_image: bool = True
+    show_image: bool = True,
+    compute_hashes: bool = True
 ):
     """
     Main function: detect tiles from HTML and visualize on screenshot.
@@ -218,36 +219,39 @@ def visualize_html_detection(
     
     print(f"✅ Detected {len(rectangles)} tiles")
     
-    # Step 3: Compute thumbnail hashes with 2s delay between fetches
-    import time
-    import hashlib
-    import base64
+    # Step 3: Compute thumbnail hashes with 2s delay between fetches (optional)
     hashes: list[str] = []
-    print("\n🔑 Computing thumbnail hashes (SHA-256)...")
-    for idx, tile in enumerate(tiles, 1):
-        url = tile.get('thumbnail_url')
-        if not url:
-            hashes.append("N/A")
-            continue
-        try:
-            resp = requests.post(f"{api_url}/fetch-image", json={"url": url}, timeout=20)
-            if resp.status_code == 200:
-                payload = resp.json()
-                if payload.get('status') == 'ok' and 'data' in payload:
-                    img_bytes = base64.b64decode(payload['data'])
-                    h = hashlib.sha256(img_bytes).hexdigest()[:12]
-                    hashes.append(h)
+    if compute_hashes:
+        import time
+        import hashlib
+        import base64
+        print("\n🔑 Computing thumbnail hashes (SHA-256)...")
+        for idx, tile in enumerate(tiles, 1):
+            url = tile.get('thumbnail_url')
+            if not url:
+                hashes.append("N/A")
+                continue
+            try:
+                resp = requests.post(f"{api_url}/fetch-image", json={"url": url}, timeout=20)
+                if resp.status_code == 200:
+                    payload = resp.json()
+                    if payload.get('status') == 'ok' and 'data' in payload:
+                        img_bytes = base64.b64decode(payload['data'])
+                        h = hashlib.sha256(img_bytes).hexdigest()[:12]
+                        hashes.append(h)
+                    else:
+                        hashes.append("ERR")
                 else:
-                    hashes.append("ERR")
-            else:
-                hashes.append("HTTP")
-        except requests.RequestException:
-            hashes.append("NET")
-        # Respect 2 second delay to avoid crashing the server
-        time.sleep(2)
+                    hashes.append("HTTP")
+            except requests.RequestException:
+                hashes.append("NET")
+            # Respect 2 second delay to avoid crashing the server
+            time.sleep(2)
+    else:
+        print("\n⏭️  Skipping hash computation")
 
-    # Step 4: Draw overlays with hash labels
-    result_path = draw_tile_overlays(screenshot, rectangles, tiles, output_path, labels=hashes)
+    # Step 4: Draw overlays with hash labels (if computed)
+    result_path = draw_tile_overlays(screenshot, rectangles, tiles, output_path, labels=hashes if hashes else None)
     
     if result_path and show_image:
         # Display the result
