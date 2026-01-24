@@ -208,8 +208,10 @@ class GrokTestApp:
             
             if response.status_code == 200:
                 data = response.json()
-                # API returns: {'status': 'ok', 'result': {'type': 'object', 'value': {...}}}
-                result = data.get('result', {})
+                # API returns: {'status': 'ok', 'result': {'result': {'type': 'object', 'value': {...}}}}
+                # Need to access the nested result
+                outer_result = data.get('result', {})
+                result = outer_result.get('result', outer_result)  # Handle both single and double nesting
                 
                 if result.get('type') == 'object' and 'value' in result:
                     info = result['value']
@@ -298,11 +300,10 @@ class GrokTestApp:
             
             if response.status_code == 200:
                 data = response.json()
-                # Debug: show what we got
-                print(f"   DEBUG: Response keys: {list(data.keys())}")
-                
-                result = data.get('result', {})
-                print(f"   DEBUG: Result type in response: {result.get('type') if isinstance(result, dict) else 'N/A'}")
+                # API returns: {'status': 'ok', 'result': {'result': {'type': 'object', 'value': {...}}}}
+                # Need to access the nested result
+                outer_result = data.get('result', {})
+                result = outer_result.get('result', outer_result)  # Handle both single and double nesting
                 
                 # Extract the returned value
                 if isinstance(result, dict) and result.get('type') == 'object' and 'value' in result:
@@ -325,10 +326,8 @@ class GrokTestApp:
                         print(f"   Value: {result_value}")
                 else:
                     print(f"⚠️  Unexpected response structure")
+                    print(f"   Outer result keys: {list(outer_result.keys()) if isinstance(outer_result, dict) else 'N/A'}")
                     print(f"   Result type: {result.get('type') if isinstance(result, dict) else type(result)}")
-                    print(f"   Result is dict: {isinstance(result, dict)}")
-                    print(f"   Has 'value' key: {'value' in result if isinstance(result, dict) else False}")
-                    print(f"   Full data keys: {list(data.keys())}")
                     print(f"   Full data: {data}")
             else:
                 print(f"❌ API error: HTTP {response.status_code}")
