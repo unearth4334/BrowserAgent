@@ -50,7 +50,8 @@ grok_test_screenshots/temp_capture.png
 # Credentials
 vastai_credentials.txt
 
-examples/forge/checkpoint_list.txtgrok_test_screenshots/
+examples/forge/checkpoint_list.txt
+grok_test_screenshots/
 debug_edges.png
 detected_tiles.txt
 

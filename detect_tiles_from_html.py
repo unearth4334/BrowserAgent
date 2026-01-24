@@ -48,6 +48,13 @@ def parse_tile_positions(html_content: str) -> List[Dict]:
             images = item.find_all('img')
             videos = item.find_all('video')
             
+            # Extract image URLs (src or data-src attributes)
+            image_urls = []
+            for img in images:
+                url = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
+                if url:
+                    image_urls.append(url)
+            
             tile_data = {
                 'index': idx,
                 'left': left,
@@ -56,6 +63,8 @@ def parse_tile_positions(html_content: str) -> List[Dict]:
                 'has_video': len(videos) > 0,
                 'num_images': len(images),
                 'num_videos': len(videos),
+                'image_urls': image_urls,  # List of image URLs
+                'thumbnail_url': image_urls[0] if image_urls else None,  # First image as thumbnail
             }
             tiles.append(tile_data)
         except (ValueError, AttributeError) as e:

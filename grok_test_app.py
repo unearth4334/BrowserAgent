@@ -497,6 +497,7 @@ class GrokTestApp:
                     tile_height=680
                 )
                 self.detected_tiles = rectangles
+                self.tile_metadata = tiles  # Store full tile data for thumbnails
             else:
                 # Run HTML-based detection without visualization
                 print("\n🌐 Fetching page source and parsing tiles...")
@@ -509,6 +510,7 @@ class GrokTestApp:
                 
                 if rectangles:
                     self.detected_tiles = rectangles
+                    self.tile_metadata = tiles  # Store full tile data including thumbnail URLs
                     print(f"\n✅ Successfully detected {len(rectangles)} tiles")
                     
                     # Show summary by column
@@ -544,6 +546,100 @@ class GrokTestApp:
             import traceback
             traceback.print_exc()
     
+    def get_tile_thumbnail(self):
+        """Fetch and display thumbnail for a specific tile."""
+        print("\n" + "="*80)
+        print("GET TILE THUMBNAIL")
+        print("="*80)
+        
+        # Check if we have HTML tile data stored
+        if not hasattr(self, 'tile_metadata') or not self.tile_metadata:
+            print("\n⚠️  No HTML tile data available.")
+            print("   Please run 'Detect Tiles (HTML-based)' first (Option 4)")
+            return
+        
+        try:
+            print(f"\nAvailable tiles: 1-{len(self.tile_metadata)}")
+            tile_num = input("Enter tile number to get thumbnail: ").strip()
+            
+            try:
+                idx = int(tile_num)
+                if idx < 1 or idx > len(self.tile_metadata):
+                    print(f"⚠️  Invalid tile number. Must be between 1 and {len(self.tile_metadata)}")
+                    return
+            except ValueError:
+                print("⚠️  Please enter a valid number")
+                return
+            
+            tile = self.tile_metadata[idx - 1]
+            thumbnail_url = tile.get('thumbnail_url')
+            
+            if not thumbnail_url:
+                print(f"❌ No thumbnail URL found for tile {idx}")
+                print(f"   Tile data: {tile}")
+                return
+            
+            print(f"\n📷 Fetching thumbnail from: {thumbnail_url}")
+            
+            # Call the API endpoint to fetch the image
+            import requests
+            api_url = "http://localhost:5000"
+            
+            try:
+                response = requests.post(
+                    f"{api_url}/fetch-image",
+                    json={"url": thumbnail_url},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('status') == 'ok':
+                        # Decode base64 image data
+                        import base64
+                        image_data = base64.b64decode(data['data'])
+                        
+                        # Save to file
+                        output_path = f"grok_test_screenshots/thumbnail_tile_{idx}.png"
+                        Path("grok_test_screenshots").mkdir(exist_ok=True)
+                        
+                        with open(output_path, 'wb') as f:
+                            f.write(image_data)
+                        
+                        print(f"✅ Thumbnail saved to: {output_path}")
+                        
+                        # Display the image
+                        img = cv2.imread(output_path)
+                        if img is not None:
+                            # Resize if too large
+                            h, w = img.shape[:2]
+                            max_size = 800
+                            if h > max_size or w > max_size:
+                                scale = max_size / max(h, w)
+                                new_h, new_w = int(h * scale), int(w * scale)
+                                img = cv2.resize(img, (new_w, new_h))
+                            
+                            cv2.imshow(f"Tile {idx} Thumbnail", img)
+                            print("👁️  Displaying thumbnail (press any key to close)...")
+                            cv2.waitKey(0)
+                            cv2.destroyAllWindows()
+                        else:
+                            print("⚠️  Image saved but couldn't display it")
+                    else:
+                        print(f"❌ API error: {data.get('error', 'Unknown error')}")
+                else:
+                    print(f"❌ HTTP error: {response.status_code}")
+                    print(f"   Response: {response.text[:200]}")
+            
+            except requests.RequestException as e:
+                print(f"❌ Network error: {e}")
+                print("   Make sure the API server is running on port 5000")
+        
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def main_menu(self):
         """Display main menu and handle user input."""
         while True:
@@ -555,10 +651,10 @@ class GrokTestApp:
             print("  3. Detect Tiles (Robust - Background Toggle)")
             print("  4. Detect Tiles (HTML-based)")
             print("  5. Click Tile")
-            print("  6. Detect Media Pane (Traditional)")
-            print("  7. Detect Media Pane (Robust - Background Toggle)")
-            print("  8. Capture Screenshot")
-            print("  9. Open Grok (navigate to Grok)")
+            print("  6. Get Tile Thumbnail")
+            print("  7. Detect Media Pane (Traditional)")
+            print("  8. Detect Media Pane (Robust - Background Toggle)")
+            print("  9. Capture Screenshot")
             print("  0. Exit")
             print("="*80)
             
@@ -592,25 +688,19 @@ class GrokTestApp:
                         print("⚠️  Please enter a valid number")
             
             elif choice == "6":
-                self.detect_and_display_media_pane(use_robust=False)
+                self.get_tile_thumbnail()
             
             elif choice == "7":
-                self.detect_and_display_media_pane(use_robust=True)
+                self.detect_and_display_media_pane(use_robust=False)
             
             elif choice == "8":
+                self.detect_and_display_media_pane(use_robust=True)
+            
+            elif choice == "9":
                 filename = input("Enter filename (default: screenshot.png): ").strip()
                 if not filename:
                     filename = "screenshot.png"
                 self.capture_screenshot(filename)
-            
-            elif choice == "9":
-                grok_url = input("Enter Grok URL (default: https://grok.x.com): ").strip()
-                if not grok_url:
-                    grok_url = "https://grok.x.com"
-                print(f"🌐 Navigating to {grok_url}")
-                self.page.goto(grok_url)
-                time.sleep(2)
-                print("✅ Navigation complete")
             
             else:
                 print("⚠️  Invalid choice")

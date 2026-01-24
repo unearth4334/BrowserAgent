@@ -224,6 +224,189 @@ Response:
 
 ---
 
+### Get Page Source
+**GET** `/page-source`
+
+Retrieve the full HTML source code of the current page.
+
+```bash
+curl http://localhost:5000/page-source
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "html": "<!DOCTYPE html><html><head>...</head><body>...</body></html>",
+  "length": 12345
+}
+```
+
+---
+
+### Query Elements
+**POST** `/elements`
+
+Query elements using a CSS selector and retrieve their properties.
+
+```bash
+# Get all links
+curl -X POST http://localhost:5000/elements \
+  -H "Content-Type: application/json" \
+  -d '{"selector": "a"}'
+
+# Get all buttons
+curl -X POST http://localhost:5000/elements \
+  -H "Content-Type: application/json" \
+  -d '{"selector": "button"}'
+
+# Get elements by ID or class
+curl -X POST http://localhost:5000/elements \
+  -H "Content-Type: application/json" \
+  -d '{"selector": ".my-class"}'
+```
+
+Request body:
+```json
+{"selector": "a"}
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "selector": "a",
+  "count": 5,
+  "elements": [
+    {
+      "tagName": "A",
+      "id": "link1",
+      "className": "nav-link",
+      "text": "Home",
+      "href": "https://example.com/",
+      "src": null,
+      "value": null,
+      "attributes": {
+        "id": "link1",
+        "class": "nav-link",
+        "href": "https://example.com/"
+      }
+    }
+  ]
+}
+```
+
+---
+
+### Get DOM Tree
+**GET** `/dom`
+
+Retrieve the complete DOM tree structure of the current page using Chrome DevTools Protocol.
+
+```bash
+curl http://localhost:5000/dom
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "dom": {
+    "root": {
+      "nodeId": 1,
+      "nodeType": 9,
+      "nodeName": "#document",
+      "children": [...]
+    }
+  }
+}
+```
+
+---
+
+### Take Screenshot
+**POST** `/screenshot`
+
+Capture a screenshot of the current page as a base64-encoded image.
+
+```bash
+# PNG screenshot (default)
+curl -X POST http://localhost:5000/screenshot
+
+# JPEG screenshot with quality
+curl -X POST http://localhost:5000/screenshot \
+  -H "Content-Type: application/json" \
+  -d '{"format": "jpeg", "quality": 80}'
+```
+
+Request body (optional):
+```json
+{
+  "format": "png",
+  "quality": 80
+}
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "format": "png",
+  "data": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "encoding": "base64"
+}
+```
+
+**Decode screenshot:**
+```bash
+# Save to file
+curl -X POST http://localhost:5000/screenshot | \
+  jq -r '.data' | base64 -d > screenshot.png
+```
+
+---
+
+### Fetch Image from URL
+**POST** `/fetch-image`
+
+Open an image URL in a new tab, capture it as a screenshot, close the tab, and return the image. The browser automatically returns to its previous state.
+
+```bash
+# Fetch an image from URL
+curl -X POST http://localhost:5000/fetch-image \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/image.jpg"}'
+```
+
+Request body:
+```json
+{
+  "url": "https://example.com/image.jpg"
+}
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "url": "https://example.com/image.jpg",
+  "format": "png",
+  "data": "iVBORw0KGgoAAAANSUhEUgAA...",
+  "encoding": "base64"
+}
+```
+
+**Save fetched image:**
+```bash
+# Fetch and save image to file
+curl -X POST http://localhost:5000/fetch-image \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/image.jpg"}' | \
+  jq -r '.data' | base64 -d > fetched-image.png
+```
+
+---
+
 ## Usage Examples
 
 ### Automated Navigation Workflow
@@ -248,6 +431,27 @@ curl -X POST http://localhost:5000/macro/scroll_down
 curl -X POST http://localhost:5000/execute \
   -H "Content-Type: application/json" \
   -d '{"code": "document.querySelector(\"h1\").textContent"}'
+```
+
+### Web Scraping
+
+```bash
+# Get page source
+curl http://localhost:5000/page-source > page.html
+
+# Query all links on the page
+curl -X POST http://localhost:5000/elements \
+  -H "Content-Type: application/json" \
+  -d '{"selector": "a"}' | jq '.elements[].href'
+
+# Get all images
+curl -X POST http://localhost:5000/elements \
+  -H "Content-Type: application/json" \
+  -d '{"selector": "img"}' | jq '.elements[].src'
+
+# Take a screenshot for documentation
+curl -X POST http://localhost:5000/screenshot | \
+  jq -r '.data' | base64 -d > screenshot.png
 ```
 
 ### Form Filling
