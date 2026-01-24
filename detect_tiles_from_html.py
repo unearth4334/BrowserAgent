@@ -158,6 +158,15 @@ def detect_tiles_from_html(
     
     print("📄 Parsing HTML for tile positions...")
     tiles = parse_tile_positions(html_content)
+    
+    # Sort tiles by reading order: top-to-bottom (rows), then left-to-right (columns)
+    # Group by row first (using 'top' coordinate with some tolerance for alignment)
+    tiles.sort(key=lambda t: (t['top'] // 50, t['left']))  # 50px tolerance for row grouping
+    
+    # Re-index after sorting
+    for idx, tile in enumerate(tiles, 1):
+        tile['index'] = idx
+    
     print(f"✅ Found {len(tiles)} tiles")
     
     if viewport_offset is None:
