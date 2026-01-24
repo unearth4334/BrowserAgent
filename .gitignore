@@ -62,3 +62,7 @@ html_detection_overlay.png
 page_source_*.html
 parsed_listitems_*.json
 html_detection_results.json
+
+# Database files
+*.db
+*.db-journal

@@ -18,6 +18,8 @@ from detect_widest_region import WidestRegionDetector
 from detect_with_background_toggle import RobustTileDetector, RobustMediaPaneDetector
 from detect_tiles_from_html import detect_tiles_from_html
 from visualize_html_detection import visualize_html_detection
+from tile_hash_db import TileHashDatabase
+from tile_hash_db import TileHashDatabase
 
 
 class GrokTestApp:
@@ -28,6 +30,8 @@ class GrokTestApp:
         self.novnc_url = "http://localhost:6080/vnc.html?autoconnect=true"
         self.detected_tiles: List[Tuple[int, int, int, int]] = []
         self.last_screenshot_path: Optional[str] = None
+        self.tile_db = TileHashDatabase("grok_tiles.db")
+        self.tile_db = TileHashDatabase("grok_tiles.db")
         
     def start_browser(self):
         """Initialize browser and navigate to noVNC page."""
@@ -54,6 +58,8 @@ class GrokTestApp:
             self.browser.close()
         if self.playwright:
             self.playwright.stop()
+        if hasattr(self, 'tile_db'):
+            self.tile_db.close()
         print("🔒 Browser closed")
     
     def capture_screenshot(self, filename: str = "screenshot.png") -> str:
@@ -245,6 +251,126 @@ class GrokTestApp:
             print(f"\n❌ Error: {e}")
             import traceback
             traceback.print_exc()
+    
+    def scan_tiles_with_hash_detection(
+        self,
+        tiles: List[Dict],
+        viewport_offset: Tuple[int, int],
+        scale_factor: Tuple[float, float],
+        api_url: str = "http://localhost:5000"
+    ) -> Tuple[int, int]:
+        """
+        Scan tiles with intelligent hash-based detection.
+        Stops when 3 consecutive tiles are unchanged.
+        
+        Args:
+            tiles: List of tile metadata dicts
+            viewport_offset: (x, y) viewport offset
+            scale_factor: (x_scale, y_scale) scaling
+            api_url: API server URL
+            
+        Returns:
+            Tuple of (tiles_processed, stop_position)
+        """
+        import requests
+        import base64
+        
+        print("\n" + "="*80)
+        print("INTELLIGENT TILE SCANNING")
+        print("="*80)
+        print(f"Total tiles found: {len(tiles)}")
+        print("Strategy: Stop at 3 consecutive unchanged tiles")
+        
+        # First, compute hashes for all tiles
+        print("\n🔑 Computing tile hashes...")
+        tile_hashes = []
+        
+        for idx, tile in enumerate(tiles, 1):
+            url = tile.get('thumbnail_url')
+            if not url:
+                tile_hashes.append(None)
+                print(f"  Tile {idx}: No thumbnail URL")
+                continue
+            
+            try:
+                resp = requests.post(
+                    f"{api_url}/fetch-image",
+                    json={"url": url},
+                    timeout=20
+                )
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get('status') == 'ok' and 'data' in data:
+                        img_bytes = base64.b64decode(data['data'])
+                        tile_hash = self.tile_db.compute_tile_hash(img_bytes)
+                        tile_hashes.append(tile_hash)
+                        print(f"  Tile {idx}: {tile_hash}")
+                    else:
+                        tile_hashes.append(None)
+                        print(f"  Tile {idx}: API error")
+                else:
+                    tile_hashes.append(None)
+                    print(f"  Tile {idx}: HTTP {resp.status_code}")
+            except Exception as e:
+                tile_hashes.append(None)
+                print(f"  Tile {idx}: Error - {e}")
+            
+            # 2 second delay between requests
+            if idx < len(tiles):
+                time.sleep(2)
+        
+        # Find stop position
+        valid_hashes = [h for h in tile_hashes if h is not None]
+        stop_pos = self.tile_db.find_stop_position(valid_hashes, required_consecutive=3)
+        
+        if stop_pos:
+            print(f"\n✋ Found 3 consecutive unchanged tiles at position {stop_pos + 1}")
+            print(f"   Processing tiles 1-{stop_pos}")
+            tiles_to_process = stop_pos
+        else:
+            print(f"\n📝 No stopping point found, processing all {len(tiles)} tiles")
+            tiles_to_process = len(tiles)
+        
+        # Process new/modified tiles
+        print(f"\n🔄 Updating database...")
+        new_count = 0
+        
+        for idx in range(1, tiles_to_process + 1):
+            if idx - 1 >= len(tile_hashes) or tile_hashes[idx - 1] is None:
+                continue
+            
+            tile_hash = tile_hashes[idx - 1]
+            tile = tiles[idx - 1]
+            
+            # Check if this is new or moved
+            existing = self.tile_db.get_tile_by_hash(tile_hash)
+            if not existing or existing['position'] != idx:
+                self.tile_db.add_or_update_tile(
+                    tile_hash=tile_hash,
+                    position=idx,
+                    thumbnail_url=tile.get('thumbnail_url'),
+                    has_video=tile.get('has_video', False),
+                    processed=False
+                )
+                new_count += 1
+        
+        # Record scan
+        self.tile_db.record_scan(
+            tiles_found=len(tiles),
+            new_tiles=new_count,
+            stopped_at_position=stop_pos
+        )
+        
+        # Show stats
+        stats = self.tile_db.get_stats()
+        print(f"\n📊 Database stats:")
+        print(f"   Total tiles in DB: {stats['total_tiles']}")
+        print(f"   Processed: {stats['processed_tiles']}")
+        print(f"   Unprocessed: {stats['unprocessed_tiles']}")
+        print(f"   New/modified this scan: {new_count}")
+        
+        return tiles_to_process, stop_pos or len(tiles)
     
     def detect_and_display_media_pane(self, use_robust: bool = False):
         """Detect media pane and display results.
@@ -572,6 +698,13 @@ class GrokTestApp:
                 )
                 self.detected_tiles = rectangles
                 self.tile_metadata = tiles  # Store full tile data for thumbnails
+                
+                # Ask if user wants hash-based scanning
+                use_hash_scan = input("\nUse intelligent hash-based scanning? (y/n): ").strip().lower()
+                if use_hash_scan == 'y' and tiles:
+                    self.scan_tiles_with_hash_detection(
+                        tiles, viewport_offset, scale_factor, "http://localhost:5000"
+                    )
             else:
                 # Run HTML-based detection without visualization
                 print("\n🌐 Fetching page source and parsing tiles...")
@@ -612,6 +745,13 @@ class GrokTestApp:
                         print(f"  ... and {len(rectangles) - 5} more")
                         
                     print("\n💡 Tiles stored in memory for clicking")
+                    
+                    # Ask if user wants hash-based scanning
+                    use_hash_scan = input("\nUse intelligent hash-based scanning? (y/n): ").strip().lower()
+                    if use_hash_scan == 'y':
+                        self.scan_tiles_with_hash_detection(
+                            tiles, viewport_offset, scale_factor, "http://localhost:5000"
+                        )
                 else:
                     print("\n❌ No tiles detected")
         
