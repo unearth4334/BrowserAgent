@@ -208,6 +208,7 @@ class GrokTestApp:
             
             if response.status_code == 200:
                 data = response.json()
+                # API returns: {'status': 'ok', 'result': {'type': 'object', 'value': {...}}}
                 result = data.get('result', {})
                 
                 if result.get('type') == 'object' and 'value' in result:
@@ -223,7 +224,10 @@ class GrokTestApp:
                         print(f"    Images: {tile['numImages']}, Videos: {tile['numVideos']}")
                         print(f"    Style: {tile['style']}...")
                 else:
-                    print(f"⚠️  Unexpected result format: {result}")
+                    print(f"⚠️  Unexpected result format")
+                    print(f"   Result type: {result.get('type')}")
+                    print(f"   Has value: {'value' in result}")
+                    print(f"   Full response: {data}")
             else:
                 print(f"❌ API error: HTTP {response.status_code}")
                 print(f"   Response: {response.text[:200]}")
@@ -294,10 +298,14 @@ class GrokTestApp:
             
             if response.status_code == 200:
                 data = response.json()
+                # Debug: show what we got
+                print(f"   DEBUG: Response keys: {list(data.keys())}")
+                
                 result = data.get('result', {})
+                print(f"   DEBUG: Result type in response: {result.get('type') if isinstance(result, dict) else 'N/A'}")
                 
                 # Extract the returned value
-                if result.get('type') == 'object' and 'value' in result:
+                if isinstance(result, dict) and result.get('type') == 'object' and 'value' in result:
                     result_value = result['value']
                     if isinstance(result_value, dict):
                         if result_value.get('success'):
@@ -313,10 +321,15 @@ class GrokTestApp:
                             print(f"   Requested: {result_value.get('requested', tile_index)}")
                             print(f"   Available: {result_value.get('total', 'unknown')}")
                     else:
-                        print(f"⚠️  Unexpected result format: {result_value}")
+                        print(f"⚠️  Unexpected result value type: {type(result_value)}")
+                        print(f"   Value: {result_value}")
                 else:
-                    print(f"⚠️  Unexpected result type: {result.get('type')}")
-                    print(f"   Full result: {result}")
+                    print(f"⚠️  Unexpected response structure")
+                    print(f"   Result type: {result.get('type') if isinstance(result, dict) else type(result)}")
+                    print(f"   Result is dict: {isinstance(result, dict)}")
+                    print(f"   Has 'value' key: {'value' in result if isinstance(result, dict) else False}")
+                    print(f"   Full data keys: {list(data.keys())}")
+                    print(f"   Full data: {data}")
             else:
                 print(f"❌ API error: HTTP {response.status_code}")
                 print(f"   Response: {response.text[:500]}")
