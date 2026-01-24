@@ -6,6 +6,7 @@ Combines tile detection, media pane detection, and browser control.
 
 import sys
 import time
+import re
 from pathlib import Path
 import cv2
 import numpy as np
@@ -171,6 +172,57 @@ class GrokTestApp:
         self.page.mouse.click(center_x, center_y)
         time.sleep(0.5)
         print("✅ Click completed")
+
+    def analyze_current_page_for_video_indicator(self):
+        """Fetch page HTML via API and detect video indicator in media pane."""
+        print("\n" + "="*80)
+        print("MEDIA PANE VIDEO ANALYSIS")
+        print("="*80)
+        # Small delay to allow content to load after click
+        time.sleep(1.5)
+
+        api_url = "http://localhost:5000"
+        try:
+            import requests
+            print("\n🌐 Fetching page source...")
+            resp = requests.get(f"{api_url}/page-source", timeout=10)
+            if resp.status_code != 200:
+                print(f"❌ HTTP error: {resp.status_code}")
+                print(f"   Response: {resp.text[:200]}")
+                return
+
+            data = resp.json()
+            html = data.get('html') or ''
+            if not html:
+                print("⚠️  Empty HTML returned")
+                return
+
+            print("📄 Analyzing HTML for video indicators...")
+            patterns = [
+                r"<video\b",
+                r'aria-label\s*=\s*"?video"?',
+                r">\s*video\s*<",
+                r"video</span>",
+                r'data-icon\s*=\s*"?video"?',
+                r'role\s*=\s*"img"[^>]*aria-label\s*=\s*"[^"]*video',
+                r'source[^>]+src=\\?"[^"]+\.(mp4|webm)'
+            ]
+
+            found = False
+            for pat in patterns:
+                if re.search(pat, html, flags=re.IGNORECASE):
+                    print(f"   ✅ Match: {pat}")
+                    found = True
+            
+            if found:
+                print("\n🎬 Video component likely present")
+            else:
+                print("\n🖼️  No video indicator found")
+
+        except Exception as e:
+            print(f"\n❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
     
     def detect_and_display_media_pane(self, use_robust: bool = False):
         """Detect media pane and display results.
@@ -684,6 +736,9 @@ class GrokTestApp:
                     tile_num = input("Enter tile number to click: ").strip()
                     try:
                         self.click_tile(int(tile_num))
+                        do_analysis = input("Analyze for video indicator? (y/n): ").strip().lower()
+                        if do_analysis == 'y':
+                            self.analyze_current_page_for_video_indicator()
                     except ValueError:
                         print("⚠️  Please enter a valid number")
             
