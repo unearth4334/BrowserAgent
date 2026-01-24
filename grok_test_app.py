@@ -160,6 +160,78 @@ class GrokTestApp:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
     
+    def diagnose_tiles(self, api_url: str = "http://localhost:5000"):
+        """Diagnose tile detection by inspecting DOM."""
+        print("\n" + "="*80)
+        print("TILE DIAGNOSTIC")
+        print("="*80)
+        
+        # JavaScript to inspect tiles in the DOM
+        js_code = """
+        (function() {
+            const tiles = document.querySelectorAll('[role="listitem"]');
+            const tileInfo = [];
+            
+            tiles.forEach((tile, idx) => {
+                const style = tile.getAttribute('style') || '';
+                const rect = tile.getBoundingClientRect();
+                const imgs = tile.querySelectorAll('img');
+                const videos = tile.querySelectorAll('video');
+                
+                tileInfo.push({
+                    index: idx + 1,
+                    style: style.substring(0, 100),
+                    visible: rect.width > 0 && rect.height > 0,
+                    x: Math.round(rect.x),
+                    y: Math.round(rect.y),
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                    numImages: imgs.length,
+                    numVideos: videos.length
+                });
+            });
+            
+            return {
+                totalTiles: tiles.length,
+                tiles: tileInfo.slice(0, 10)  // First 10 tiles
+            };
+        })();
+        """
+        
+        try:
+            import requests
+            response = requests.post(
+                f"{api_url}/execute",
+                json={"code": js_code},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                result = data.get('result', {})
+                
+                if result.get('type') == 'object' and 'value' in result:
+                    info = result['value']
+                    print(f"\n📊 Found {info.get('totalTiles', 0)} tiles in DOM")
+                    print(f"\n🔍 First {len(info.get('tiles', []))} tiles:")
+                    
+                    for tile in info.get('tiles', []):
+                        print(f"\n  Tile {tile['index']}:")
+                        print(f"    Position: ({tile['x']}, {tile['y']})")
+                        print(f"    Size: {tile['width']}x{tile['height']}")
+                        print(f"    Visible: {tile['visible']}")
+                        print(f"    Images: {tile['numImages']}, Videos: {tile['numVideos']}")
+                        print(f"    Style: {tile['style']}...")
+                else:
+                    print(f"⚠️  Unexpected result format: {result}")
+            else:
+                print(f"❌ API error: HTTP {response.status_code}")
+                print(f"   Response: {response.text[:200]}")
+        except Exception as e:
+            print(f"❌ Error diagnosing tiles: {e}")
+            import traceback
+            traceback.print_exc()
+    
     def click_tile(self, tile_index: int, api_url: str = "http://localhost:5000"):
         """Click on a tile by index using JavaScript via API."""
         if not self.detected_tiles:
@@ -177,12 +249,37 @@ class GrokTestApp:
         js_code = f"""
         (function() {{
             const tiles = document.querySelectorAll('[role="listitem"]');
+            console.log('Total tiles found:', tiles.length);
+            console.log('Attempting to click tile index:', {tile_index - 1});
+            
             if (tiles.length >= {tile_index}) {{
                 const tile = tiles[{tile_index - 1}];
+                const rect = tile.getBoundingClientRect();
+                console.log('Tile rect:', rect);
+                console.log('Tile visible:', rect.width > 0 && rect.height > 0);
+                
                 tile.click();
-                return {{success: true, index: {tile_index}, total: tiles.length}};
+                console.log('Click executed on tile', {tile_index});
+                
+                return {{
+                    success: true,
+                    index: {tile_index},
+                    total: tiles.length,
+                    rect: {{
+                        x: Math.round(rect.x),
+                        y: Math.round(rect.y),
+                        width: Math.round(rect.width),
+                        height: Math.round(rect.height)
+                    }}
+                }};
             }} else {{
-                return {{success: false, error: 'Tile not found', total: tiles.length}};
+                console.error('Tile not found! Requested:', {tile_index}, 'Available:', tiles.length);
+                return {{
+                    success: false,
+                    error: 'Tile not found',
+                    requested: {tile_index},
+                    total: tiles.length
+                }};
             }}
         }})();
         """
@@ -202,14 +299,27 @@ class GrokTestApp:
                 # Extract the returned value
                 if result.get('type') == 'object' and 'value' in result:
                     result_value = result['value']
-                    if isinstance(result_value, dict) and result_value.get('success'):
-                        print(f"✅ Tile {tile_index} clicked successfully")
+                    if isinstance(result_value, dict):
+                        if result_value.get('success'):
+                            print(f"✅ Tile {tile_index} clicked successfully")
+                            if 'rect' in result_value:
+                                rect = result_value['rect']
+                                print(f"   Position: ({rect['x']}, {rect['y']})")
+                                print(f"   Size: {rect['width']}x{rect['height']}")
+                            print(f"   Total tiles in DOM: {result_value.get('total', 'unknown')}")
+                        else:
+                            print(f"❌ Click failed!")
+                            print(f"   Error: {result_value.get('error', 'Unknown')}")
+                            print(f"   Requested: {result_value.get('requested', tile_index)}")
+                            print(f"   Available: {result_value.get('total', 'unknown')}")
                     else:
-                        print(f"⚠️  Click result: {result_value}")
+                        print(f"⚠️  Unexpected result format: {result_value}")
                 else:
-                    print(f"✅ Click executed")
+                    print(f"⚠️  Unexpected result type: {result.get('type')}")
+                    print(f"   Full result: {result}")
             else:
                 print(f"❌ API error: HTTP {response.status_code}")
+                print(f"   Response: {response.text[:500]}")
         except Exception as e:
             print(f"❌ Error clicking tile: {e}")
         
@@ -910,6 +1020,7 @@ class GrokTestApp:
             print("  8. Detect Media Pane (Robust - Background Toggle)")
             print("  9. Capture Screenshot")
             print(" 10. Clear Tile Hash Database")
+            print(" 11. Diagnose Tile Detection")
             print("  0. Exit")
             print("="*80)
             
@@ -971,6 +1082,9 @@ class GrokTestApp:
                     print(f"   Total scans: {stats['total_scans']}")
                 else:
                     print("\n❌ Clear cancelled")
+            
+            elif choice == "11":
+                self.diagnose_tiles()
             
             else:
                 print("⚠️  Invalid choice")
