@@ -132,6 +132,99 @@ Response:
 
 ---
 
+### Scroll Page
+**POST** `/scroll`
+
+Scroll the page using Chrome DevTools Protocol. Automatically detects scrollable containers (like SPAs with inner scrollable divs) or falls back to window scrolling. Supports both absolute positioning and relative scrolling.
+
+**Absolute positioning:**
+```bash
+# Scroll to specific position (x=0, y=500)
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"x": 0, "y": 500}'
+
+# Scroll to top
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"x": 0, "y": 0}'
+```
+
+**Relative scrolling:**
+```bash
+# Scroll down 300 pixels
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaX": 0, "deltaY": 300}'
+
+# Scroll up 300 pixels
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaX": 0, "deltaY": -300}'
+
+# Scroll right 200 pixels
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaX": 200, "deltaY": 0}'
+
+# Explicitly target window instead of auto-detect
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaX": 0, "deltaY": 300, "target": "window"}'
+
+# Target a specific element by CSS selector
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaX": 0, "deltaY": 300, "target": ".main-content"}'
+```
+
+Request body (absolute):
+```json
+{"x": 0, "y": 500}
+```
+
+Request body (relative):
+```json
+{"deltaX": 0, "deltaY": 300}
+```
+
+Request body (with target):
+```json
+{"deltaX": 0, "deltaY": 300, "target": "auto"}
+```
+
+**Target options:**
+- `"auto"` (default): Automatically finds scrollable containers (e.g., SPAs with overflow divs)
+- `"window"`: Force scroll the browser window
+- CSS selector: Target a specific element (e.g., `".main-content"`, `"#scrollable-panel"`)
+
+Response (absolute):
+```json
+{
+  "status": "ok",
+  "scroll": {"x": 0, "y": 500},
+  "mode": "absolute",
+  "scrolled": {"target": "element", "scrollTop": 500, "scrollLeft": 0}
+}
+```
+
+Response (relative):
+```json
+{
+  "status": "ok",
+  "scroll": {"deltaX": 0, "deltaY": 300},
+  "mode": "relative",
+  "scrolled": {"target": "element", "scrollTop": 300, "scrollLeft": 0}
+}
+```
+
+The `scrolled` field shows:
+- `target`: `"element"` if scrolled an inner container, `"window"` if scrolled the window
+- `scrollTop`/`scrollY`: Current scroll position after scrolling
+- `scrollLeft`/`scrollX`: Current horizontal scroll position
+
+---
+
 ### Type Text
 **POST** `/type`
 
@@ -369,7 +462,7 @@ curl -X POST http://localhost:5000/screenshot | \
 ### Fetch Image from URL
 **POST** `/fetch-image`
 
-Open an image URL in a new tab, capture it as a screenshot, close the tab, and return the image. The browser automatically returns to its previous state.
+Fetch an image from a URL and return it as base64-encoded data. The endpoint retrieves the actual image file, preserving its original format (JPEG, PNG, etc.) and returns metadata about the image.
 
 ```bash
 # Fetch an image from URL
@@ -390,20 +483,45 @@ Response:
 {
   "status": "ok",
   "url": "https://example.com/image.jpg",
-  "format": "png",
+  "format": "JPEG",
+  "content_type": "image/jpeg",
+  "size_bytes": 52539,
   "data": "iVBORw0KGgoAAAANSUhEUgAA...",
   "encoding": "base64"
 }
 ```
 
-**Save fetched image:**
+**Response fields:**
+- `status`: "ok" if successful
+- `url`: The original URL that was fetched
+- `format`: Image format (JPEG, PNG, GIF, etc.)
+- `content_type`: MIME type of the image
+- `size_bytes`: Size of the image in bytes
+- `data`: Base64-encoded image data
+- `encoding`: Always "base64"
+
+**Usage examples:**
 ```bash
-# Fetch and save image to file
+# Fetch and save image preserving original format
 curl -X POST http://localhost:5000/fetch-image \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/image.jpg"}' | \
-  jq -r '.data' | base64 -d > fetched-image.png
+  -d '{"url": "https://httpbin.org/image/jpeg"}' | \
+  jq -r '.data' | base64 -d > photo.jpg
+
+# Check image info before downloading
+curl -X POST http://localhost:5000/fetch-image \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/large.png"}' | \
+  jq '{format, content_type, size_bytes}'
+
+# Fetch video preview image (handles authentication)
+curl -X POST http://localhost:5000/fetch-image \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://assets.grok.com/users/.../preview_image.jpg"}' | \
+  jq -r '.data' | base64 -d > preview.jpg
 ```
+
+**Note:** This endpoint uses the browser's authenticated session to fetch images, making it useful for retrieving images that require authentication or have CORS restrictions.
 
 ---
 
@@ -423,9 +541,11 @@ curl -X POST http://localhost:5000/type \
 # Press Enter
 curl -X POST http://localhost:5000/macro/enter
 
-# Wait for page load, then scroll down
+# Wait for page load, then scroll down using CDP
 sleep 2
-curl -X POST http://localhost:5000/macro/scroll_down
+curl -X POST http://localhost:5000/scroll \
+  -H "Content-Type: application/json" \
+  -d '{"deltaX": 0, "deltaY": 500}'
 
 # Execute JavaScript to extract data
 curl -X POST http://localhost:5000/execute \

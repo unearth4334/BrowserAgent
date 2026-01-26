@@ -10,6 +10,7 @@ from browser_agent.browser.actions import (
     UploadFile,
     SelectOption,
     SetSlider,
+    Scroll,
 )
 
 
@@ -75,3 +76,26 @@ def test_set_slider_action():
     ss = SetSlider(selector="input[type=range]", value=50.5)
     assert ss.selector == "input[type=range]"
     assert ss.value == 50.5
+
+
+def test_scroll_action():
+    """Test Scroll action initialization."""
+    # Test pixel-based scrolling
+    scroll_down = Scroll(pixels=1000, direction="down")
+    assert scroll_down.pixels == 1000
+    assert scroll_down.direction == "down"
+    assert scroll_down.selector is None
+    
+    # Test scrolling up
+    scroll_up = Scroll(pixels=500, direction="up")
+    assert scroll_up.pixels == 500
+    assert scroll_up.direction == "up"
+    
+    # Test element-based scrolling
+    scroll_to_elem = Scroll(selector="#target-element")
+    assert scroll_to_elem.selector == "#target-element"
+    assert scroll_to_elem.pixels is None
+    
+    # Test horizontal scrolling
+    scroll_right = Scroll(pixels=300, direction="right")
+    assert scroll_right.direction == "right"

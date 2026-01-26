@@ -9,7 +9,7 @@ from playwright.sync_api import sync_playwright, Browser as PWBrowser, Page, Err
 from .actions import (
     Action, Navigate, Click, Type, WaitForSelector, WaitForUser, 
     ExtractLinks, ExtractHTML, ExecuteJS, UploadFile, SelectOption, SetSlider,
-    Screenshot, ClickAtCoordinates
+    Screenshot, ClickAtCoordinates, Scroll
 )
 from .observation import PageObservation, ButtonInfo, InputInfo
 from ..logging_utils import get_logger
@@ -249,6 +249,29 @@ class PlaywrightBrowserController:
                 # Click at specific coordinates
                 page.mouse.click(action.x, action.y, button=action.button)
                 logger.info("Clicked at coordinates (%d, %d) with %s button", action.x, action.y, action.button)
+            elif isinstance(action, Scroll):
+                # Scroll the page
+                if action.selector:
+                    # Scroll to specific element
+                    element = page.query_selector(action.selector)
+                    if element:
+                        element.scroll_into_view_if_needed()
+                        logger.info("Scrolled to element: %s", action.selector)
+                    else:
+                        logger.warning("Element not found for scrolling: %s", action.selector)
+                elif action.pixels:
+                    # Scroll by specific amount
+                    if action.direction == "down":
+                        page.evaluate(f"window.scrollBy(0, {action.pixels})")
+                    elif action.direction == "up":
+                        page.evaluate(f"window.scrollBy(0, -{action.pixels})")
+                    elif action.direction == "right":
+                        page.evaluate(f"window.scrollBy({action.pixels}, 0)")
+                    elif action.direction == "left":
+                        page.evaluate(f"window.scrollBy(-{action.pixels}, 0)")
+                    logger.info("Scrolled %s by %d pixels", action.direction, action.pixels)
+                else:
+                    logger.warning("Scroll action requires either selector or pixels parameter")
             else:  # pragma: no cover - safety
                 raise ValueError(f"Unknown action type {action}")
         except Exception as e:

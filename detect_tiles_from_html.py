@@ -6,6 +6,7 @@ Uses the page source API to get exact tile positions instead of visual detection
 
 import requests
 import json
+import hashlib
 from bs4 import BeautifulSoup
 from typing import List, Tuple, Dict, Optional
 
@@ -197,6 +198,34 @@ def detect_tiles_from_html(
         print(f"    Column at x={col_x}px: {len(columns[col_x])} tiles")
     
     return rectangles, tiles
+
+
+def fetch_thumbnail_hash(thumbnail_url: str, timeout: int = 10) -> Optional[str]:
+    """
+    Fetch a thumbnail image and compute its hash.
+    
+    Args:
+        thumbnail_url: URL of the thumbnail image
+        timeout: Request timeout in seconds
+        
+    Returns:
+        12-character hex hash of the image, or None if fetch failed
+    """
+    try:
+        # Handle relative URLs
+        if thumbnail_url.startswith('/'):
+            # Assuming images are served from same host as API
+            thumbnail_url = f"http://localhost:6080{thumbnail_url}"
+        
+        response = requests.get(thumbnail_url, timeout=timeout)
+        response.raise_for_status()
+        
+        # Compute hash
+        image_bytes = response.content
+        return hashlib.sha256(image_bytes).hexdigest()[:12]
+    except Exception as e:
+        print(f"⚠️ Failed to fetch thumbnail {thumbnail_url}: {e}")
+        return None
 
 
 def save_detection_results(

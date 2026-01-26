@@ -10,6 +10,8 @@ A Python-based browser automation framework with a layered agent architecture us
 - **Headless Mode**: Full support for containerized environments (Docker, cloud instances)
 - **Agent Framework**: Observe-decide-act loop with pluggable policy system
 - **Interactive Session**: REPL for debugging and manual browser control
+- **Scrolling Support**: Native scrolling actions for infinite scroll interfaces
+- **Tile Detection & Hashing**: HTML-based tile detection with persistent hash tracking
 - **Comprehensive Test Infrastructure**: Mock browser patterns, fixtures, and integration tests
 
 ## Installation
@@ -59,6 +61,42 @@ obs = client.observe()
 ```
 
 See [docs/BROWSER_SERVER_GUIDE.md](docs/BROWSER_SERVER_GUIDE.md) for details.
+
+### Scrolling and Tile Collection
+
+For applications with infinite scrolling interfaces (e.g., image galleries), BrowserAgent provides:
+
+```python
+from browser_agent.browser.actions import Scroll
+
+# Scroll down by pixels
+controller.perform(Scroll(pixels=1000, direction="down"))
+
+# Scroll to element
+controller.perform(Scroll(selector="#target-element"))
+```
+
+**Example: Intelligent tile scanning with HTML catalog**
+
+```bash
+# Collect first 100 tiles with stable API fetching and generate HTML catalog
+python scan_and_catalog_tiles.py
+
+# Fast collection (may have some failures)
+python test_scroll_and_collect_tiles.py
+
+# View collected tile statistics
+python show_tile_stats.py
+```
+
+**Features:**
+- 🖼️ Generates beautiful HTML catalog with thumbnails
+- 📊 Stores tiles in SQLite database with SHA-256 hashes
+- 🔄 Automatic scrolling with infinite scroll support
+- ✅ Stable API-based image fetching (no 403 errors)
+- ⏱️ Configurable delays for reliability
+
+See [CATALOG_GUIDE.md](CATALOG_GUIDE.md) and [SCROLLING_GUIDE.md](SCROLLING_GUIDE.md) for complete documentation.
 
 ## Configuration
 

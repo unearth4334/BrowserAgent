@@ -88,6 +88,14 @@ class ClickAtCoordinates:
     button: str = "left"  # "left", "right", or "middle"
 
 
+@dataclass
+class Scroll:
+    """Scroll the page by a specified amount or to a specific element."""
+    pixels: int | None = None  # Scroll by this many pixels (positive = down, negative = up)
+    selector: str | None = None  # Scroll to this element
+    direction: str = "down"  # "down", "up", "left", "right" (when using pixels)
+
+
 Action = Union[
     Navigate,
     Click,
@@ -102,4 +110,5 @@ Action = Union[
     SetSlider,
     Screenshot,
     ClickAtCoordinates,
+    Scroll,
 ]
