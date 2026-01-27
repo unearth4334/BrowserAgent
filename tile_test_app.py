@@ -9,6 +9,7 @@ import sys
 import time
 import base64
 import hashlib
+import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 import requests
@@ -19,7 +20,7 @@ from tile_hash_db import TileHashDatabase
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from browser_agent.browser.playwright_driver import PlaywrightBrowserController
-from browser_agent.browser.actions import Navigate, WaitForUser
+from browser_agent.browser.actions import Navigate, WaitForUser, ClickAtCoordinates
 from browser_agent.config import Settings
 
 
@@ -30,6 +31,7 @@ VIEWPORT_HEIGHT = 1404
 
 # Global browser controller
 _browser_controller = None
+_dom_offset = None
 
 
 def fetch_tile_image(thumbnail_url):
@@ -204,23 +206,198 @@ def scroll_down(delta_y=800):
         return False
 
 
-def click_at_position(x, y):
-    """Click at specific coordinates using the API."""
+def click_at_position(screen_x, screen_y, dom_x=None, dom_y=None):
+    """Click at specific coordinates using the API, fallback to controller."""
     try:
-        response = requests.post(
-            f"{API_URL}/click",
-            json={"x": x, "y": y},
-            timeout=10
-        )
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('status') in ['success', 'ok']
-        else:
-            print(f"Click failed with status {response.status_code}: {response.text}")
-            return False
+        js_x = dom_x if dom_x is not None else screen_x
+        js_y = dom_y if dom_y is not None else screen_y
+        probe_js = f"""
+(() => {{
+    const x = {js_x};
+    const y = {js_y};
+    const el = document.elementFromPoint(x, y);
+    const info = el ? {{
+        tag: el.tagName,
+        id: el.id || null,
+        className: el.className || null,
+        ariaLabel: el.getAttribute && el.getAttribute('aria-label')
+    }} : null;
+    let marker = document.getElementById('__click_marker__');
+    if (!marker) {{
+        marker = document.createElement('div');
+        marker.id = '__click_marker__';
+        marker.style.position = 'fixed';
+        marker.style.width = '16px';
+        marker.style.height = '16px';
+        marker.style.border = '2px solid red';
+        marker.style.borderRadius = '50%';
+        marker.style.zIndex = '999999';
+        marker.style.pointerEvents = 'none';
+        document.body.appendChild(marker);
+    }}
+    marker.style.left = (x - 8) + 'px';
+    marker.style.top = (y - 8) + 'px';
+    return {{ x, y, info }};
+}})()
+"""
+        resp = requests.post(f"{API_URL}/execute", json={"code": probe_js}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') in ['success', 'ok']:
+                print(f"   🔎 elementFromPoint: {data.get('result')}")
     except Exception as e:
-        print(f"Error clicking at ({x}, {y}): {e}")
+        print(f"   ⚠️ Debug probe failed: {e}")
+
+    try:
+        click_js = f"""
+(() => {{
+    const x = {js_x};
+    const y = {js_y};
+    const el = document.elementFromPoint(x, y);
+    if (!el) return {{ clicked: false, reason: 'no-element' }};
+    el.dispatchEvent(new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window }}));
+    return {{ clicked: true, tag: el.tagName, id: el.id || null, className: el.className || null }};
+}})()
+"""
+        resp = requests.post(f"{API_URL}/execute", json={"code": click_js}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') in ['success', 'ok']:
+                result = data.get('result')
+                if isinstance(result, dict) and result.get('clicked'):
+                    print(f"   ✅ JS click dispatched: {result}")
+                    return True
+    except Exception as e:
+        print(f"   ⚠️ JS click failed at ({js_x}, {js_y}): {e}")
+
+    try:
+        controller = start_browser()
+        controller.perform(ClickAtCoordinates(x=screen_x, y=screen_y))
+        return True
+    except Exception as e:
+        print(f"Error clicking at ({screen_x}, {screen_y}): {e}")
         return False
+
+
+def get_dom_offset():
+    """Compute DOM-to-viewport offset using the first listitem."""
+    global _dom_offset
+    if _dom_offset is not None:
+        return _dom_offset
+
+    try:
+        offset_js = """
+(() => {
+    const el = document.querySelector('[role="listitem"]');
+    if (!el) return { offsetX: 0, offsetY: 0, reason: 'no-listitem' };
+    const rect = el.getBoundingClientRect();
+    const styleLeft = parseFloat(el.style.left || '0');
+    const styleTop = parseFloat(el.style.top || '0');
+    const parent = el.offsetParent;
+    const parentRect = parent ? parent.getBoundingClientRect() : { left: 0, top: 0 };
+    const offsetFromParent = { x: parentRect.left, y: parentRect.top };
+    const offsetFromStyle = { x: rect.left - styleLeft, y: rect.top - styleTop };
+    const offsetX = Number.isFinite(offsetFromParent.x) && offsetFromParent.x > 0 ? offsetFromParent.x : offsetFromStyle.x;
+    const offsetY = Number.isFinite(offsetFromParent.y) && offsetFromParent.y > 0 ? offsetFromParent.y : offsetFromStyle.y;
+    return { offsetX, offsetY, parentLeft: offsetFromParent.x, parentTop: offsetFromParent.y, rectLeft: rect.left, rectTop: rect.top, styleLeft, styleTop };
+})()
+"""
+        resp = requests.post(f"{API_URL}/execute", json={"code": offset_js}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') in ['success', 'ok']:
+                result = data.get('result') or {}
+                offset_x = int(result.get('offsetX', 0) or 0)
+                offset_y = int(result.get('offsetY', 0) or 0)
+                _dom_offset = (offset_x, offset_y)
+                print(f"   📐 DOM offset: ({offset_x}, {offset_y})")
+                return _dom_offset
+    except Exception as e:
+        print(f"   ⚠️ Failed to compute DOM offset: {e}")
+
+    _dom_offset = (0, 0)
+    return _dom_offset
+
+
+def draw_tile_borders(tiles, max_tiles=None):
+    """Draw red borders around detected tiles in the page using DOM coordinates."""
+    offset_x, offset_y = get_dom_offset()
+    draw_tiles = [t for t in tiles if isinstance(t.get('index'), int)]
+    if max_tiles is not None:
+        draw_tiles = draw_tiles[:max_tiles]
+
+    payload = [
+        {
+            "index": t["index"],
+            "label": t.get("global_position", t["index"]),
+            "x": t.get("dom_x", t.get("left", 0)) + offset_x,
+            "y": t.get("dom_y", t.get("top", 0)) + offset_y,
+            "w": t.get("dom_w", t.get("width", 0)),
+            "h": t.get("dom_h", t.get("height", 0)),
+        }
+        for t in draw_tiles
+    ]
+
+    if not payload:
+        print("   ⚠️ No tiles available to draw")
+        return False
+
+    try:
+        overlay_js = f"""
+(() => {{
+    const tiles = {json.dumps(payload)};
+    let overlay = document.getElementById('__tile_bounds__');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = '__tile_bounds__';
+    overlay.style.position = 'fixed';
+    overlay.style.left = '0';
+    overlay.style.top = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.zIndex = '999999';
+    overlay.style.pointerEvents = 'none';
+    document.body.appendChild(overlay);
+
+    tiles.forEach(t => {{
+        const box = document.createElement('div');
+        box.style.position = 'fixed';
+        box.style.left = t.x + 'px';
+        box.style.top = t.y + 'px';
+        box.style.width = t.w + 'px';
+        box.style.height = t.h + 'px';
+        box.style.border = '2px solid red';
+        box.style.boxSizing = 'border-box';
+        box.style.pointerEvents = 'none';
+
+        const label = document.createElement('div');
+        label.textContent = String(t.label);
+        label.style.position = 'absolute';
+        label.style.left = '0';
+        label.style.top = '0';
+        label.style.background = 'red';
+        label.style.color = 'white';
+        label.style.fontSize = '12px';
+        label.style.padding = '1px 3px';
+        box.appendChild(label);
+
+        overlay.appendChild(box);
+    }});
+
+    return {{ drawn: tiles.length }};
+}})()
+"""
+
+        resp = requests.post(f"{API_URL}/execute", json={"code": overlay_js}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') in ['success', 'ok']:
+                print(f"   🟥 Drew borders for {len(payload)} tiles")
+                return True
+    except Exception as e:
+        print(f"   ⚠️ Failed to draw tile borders: {e}")
+    return False
 
 
 def catalog_tiles(num_tiles, clear_db=False):
@@ -247,6 +424,9 @@ def catalog_tiles(num_tiles, clear_db=False):
     print(f"\n📊 Cataloging {num_tiles} tiles...")
     print("=" * 60)
     
+    scale_factor = (0.75, 0.75)
+    tile_height = 680
+
     while len(all_tiles) < num_tiles and scroll_iterations < max_scroll_iterations:
         scroll_iterations += 1
         print(f"\n📍 Scroll iteration #{scroll_iterations} - Collected: {len(all_tiles)}/{num_tiles}")
@@ -254,8 +434,8 @@ def catalog_tiles(num_tiles, clear_db=False):
         # Detect tiles using the same method as simple_catalog_click.py
         rectangles, tiles = detect_tiles_from_html(
             api_url=API_URL,
-            scale_factor=(0.75, 0.75),
-            tile_height=680
+            scale_factor=scale_factor,
+            tile_height=tile_height
         )
         
         print(f"   Detected {len(tiles)} tiles in current view")
@@ -278,6 +458,14 @@ def catalog_tiles(num_tiles, clear_db=False):
             tile['screen_y'] = y
             tile['screen_w'] = w
             tile['screen_h'] = h
+            tile['dom_x'] = tile.get('left', 0)
+            tile['dom_y'] = tile.get('top', 0)
+            tile['dom_w'] = tile.get('width', 0)
+            tile['dom_h'] = tile_height
+            tile['viewport_x'] = int(tile.get('left', 0) * scale_factor[0])
+            tile['viewport_y'] = int(tile.get('top', 0) * scale_factor[1])
+            tile['viewport_w'] = int(tile.get('width', 0) * scale_factor[0])
+            tile['viewport_h'] = int(tile_height * scale_factor[1])
             new_tiles_in_view.append(tile)
         
         print(f"   Fetching thumbnails for {len(new_tiles_in_view)} new tiles...")
@@ -349,12 +537,18 @@ def click_tile(tiles, tile_number):
         return False
     
     # Calculate click coordinates (center of tile)
-    click_x = target_tile.get('screen_x', target_tile.get('left', 0)) + (target_tile.get('screen_w', target_tile.get('width', 0)) // 2)
-    click_y = target_tile.get('screen_y', target_tile.get('top', 0)) + (target_tile.get('screen_h', target_tile.get('height', 0)) // 2)
+    screen_x = target_tile.get('screen_x', target_tile.get('left', 0)) + (target_tile.get('screen_w', target_tile.get('width', 0)) // 2)
+    screen_y = target_tile.get('screen_y', target_tile.get('top', 0)) + (target_tile.get('screen_h', target_tile.get('height', 0)) // 2)
+    dom_x = target_tile.get('dom_x', target_tile.get('left', 0)) + (target_tile.get('dom_w', target_tile.get('width', 0)) // 2)
+    dom_y = target_tile.get('dom_y', target_tile.get('top', 0)) + (target_tile.get('dom_h', target_tile.get('height', 0)) // 2)
+    offset_x, offset_y = get_dom_offset()
+    dom_x += offset_x
+    dom_y += offset_y
     
-    print(f"\n🖱️  Clicking tile #{tile_number} at ({click_x}, {click_y})...")
+    print(f"\n🖱️  Clicking tile #{tile_number} at screen ({screen_x}, {screen_y}) / dom ({dom_x}, {dom_y})...")
+    draw_tile_borders(tiles)
     
-    success = click_at_position(click_x, click_y)
+    success = click_at_position(screen_x, screen_y, dom_x=dom_x, dom_y=dom_y)
     
     if success:
         print(f"✓ Clicked tile #{tile_number}")
@@ -685,6 +879,7 @@ Interactive mode:
             generate_html_report(tiles, args.output, clicked_tile)
         
         print("\n✅ Test completed successfully!")
+        input("\nPress Enter to quit...")
         stop_browser()
         return 0
         
