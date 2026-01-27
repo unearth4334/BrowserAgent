@@ -306,10 +306,10 @@ def click_tile_by_dom_position(left, top, api_url=API_URL):
 
     const match = tiles.find(el => {{
         const style = el.getAttribute('style') || '';
-        const leftMatch = /left:\s*(\d+)px/.exec(style);
-        const topMatch = /top:\s*(\d+)px/.exec(style);
-        const leftVal = leftMatch ? parseInt(leftMatch[1], 10) : null;
-        const topVal = topMatch ? parseInt(topMatch[1], 10) : null;
+        const leftMatch = /left:\\s*([0-9.]+)px/.exec(style);
+        const topMatch = /top:\\s*([0-9.]+)px/.exec(style);
+        const leftVal = leftMatch ? Math.round(parseFloat(leftMatch[1])) : null;
+        const topVal = topMatch ? Math.round(parseFloat(topMatch[1])) : null;
         return leftVal === targetLeft && topVal === targetTop;
     }});
 
@@ -320,11 +320,14 @@ def click_tile_by_dom_position(left, top, api_url=API_URL):
     const rect = match.getBoundingClientRect();
     match.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
 
-    let clickTarget = match.querySelector('a') || match.querySelector('button') || match;
+    const centerX = Math.round(rect.left + rect.width / 2);
+    const centerY = Math.round(rect.top + rect.height / 2);
+    const hit = document.elementFromPoint(centerX, centerY) || match;
+    let clickTarget = hit.closest('a,button') || hit;
 
-    const mousedownEvent = new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window }});
-    const mouseupEvent = new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window }});
-    const clickEvent = new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window }});
+    const mousedownEvent = new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window, clientX: centerX, clientY: centerY }});
+    const mouseupEvent = new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window, clientX: centerX, clientY: centerY }});
+    const clickEvent = new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window, clientX: centerX, clientY: centerY }});
 
     clickTarget.dispatchEvent(mousedownEvent);
     clickTarget.dispatchEvent(mouseupEvent);
@@ -336,7 +339,9 @@ def click_tile_by_dom_position(left, top, api_url=API_URL):
         total: tiles.length,
         clickTarget: clickTarget.tagName,
         hasHref: !!clickTarget.href,
-        rect: {{ x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }}
+        rect: {{ x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }},
+        center: {{ x: centerX, y: centerY }},
+        hitTag: hit.tagName
     }};
 }})()
 """
@@ -437,10 +442,10 @@ def draw_tile_borders(tiles, max_tiles=None):
         tiles.forEach(t => {{
             const el = items.find(node => {{
                 const style = node.getAttribute('style') || '';
-                const leftMatch = /left:\s*(\d+)px/.exec(style);
-                const topMatch = /top:\s*(\d+)px/.exec(style);
-                const leftVal = leftMatch ? parseInt(leftMatch[1], 10) : null;
-                const topVal = topMatch ? parseInt(topMatch[1], 10) : null;
+                const leftMatch = /left:\\s*([0-9.]+)px/.exec(style);
+                const topMatch = /top:\\s*([0-9.]+)px/.exec(style);
+                const leftVal = leftMatch ? Math.round(parseFloat(leftMatch[1])) : null;
+                const topVal = topMatch ? Math.round(parseFloat(topMatch[1])) : null;
                 return leftVal === t.left && topVal === t.top;
             }});
             if (!el) return;
