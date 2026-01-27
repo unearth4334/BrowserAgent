@@ -293,19 +293,34 @@ def _unwrap_execute_result(data):
     return None
 
 
-def click_tile_by_dom_index(tile_index, api_url=API_URL):
-    """Click a tile by its DOM listitem index using JS events."""
+def click_tile_by_dom_position(left, top, api_url=API_URL):
+    """Click a tile by matching its DOM style left/top using JS events."""
     js_code = f"""
 (() => {{
-    const tiles = document.querySelectorAll('[role="listitem"]');
-    if (!tiles || tiles.length < {tile_index}) {{
-        return {{ success: false, error: 'Tile not found', requested: {tile_index}, total: tiles ? tiles.length : 0 }};
+    const targetLeft = {left};
+    const targetTop = {top};
+    const tiles = Array.from(document.querySelectorAll('[role="listitem"]'));
+    if (!tiles.length) {{
+        return {{ success: false, error: 'No tiles found' }};
     }}
-    const tile = tiles[{tile_index - 1}];
-    const rect = tile.getBoundingClientRect();
-    tile.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
 
-    let clickTarget = tile.querySelector('a') || tile.querySelector('button') || tile;
+    const match = tiles.find(el => {{
+        const style = el.getAttribute('style') || '';
+        const leftMatch = /left:\s*(\d+)px/.exec(style);
+        const topMatch = /top:\s*(\d+)px/.exec(style);
+        const leftVal = leftMatch ? parseInt(leftMatch[1], 10) : null;
+        const topVal = topMatch ? parseInt(topMatch[1], 10) : null;
+        return leftVal === targetLeft && topVal === targetTop;
+    }});
+
+    if (!match) {{
+        return {{ success: false, error: 'Tile not found by position', requested: {{ left: targetLeft, top: targetTop }}, total: tiles.length }};
+    }}
+
+    const rect = match.getBoundingClientRect();
+    match.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+
+    let clickTarget = match.querySelector('a') || match.querySelector('button') || match;
 
     const mousedownEvent = new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window }});
     const mouseupEvent = new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window }});
@@ -318,7 +333,6 @@ def click_tile_by_dom_index(tile_index, api_url=API_URL):
 
     return {{
         success: true,
-        index: {tile_index},
         total: tiles.length,
         clickTarget: clickTarget.tagName,
         hasHref: !!clickTarget.href,
@@ -402,6 +416,8 @@ def draw_tile_borders(tiles, max_tiles=None):
             "y": t.get("screen_y", 0),
             "w": t.get("screen_w", 0),
             "h": t.get("screen_h", 0),
+            "left": t.get("left", t.get("dom_x", 0)),
+            "top": t.get("top", t.get("dom_y", 0)),
         }
         for t in draw_tiles
     ]
@@ -419,7 +435,14 @@ def draw_tile_borders(tiles, max_tiles=None):
     const applyOutline = () => {{
         let drawn = 0;
         tiles.forEach(t => {{
-            const el = items[t.index - 1];
+            const el = items.find(node => {{
+                const style = node.getAttribute('style') || '';
+                const leftMatch = /left:\s*(\d+)px/.exec(style);
+                const topMatch = /top:\s*(\d+)px/.exec(style);
+                const leftVal = leftMatch ? parseInt(leftMatch[1], 10) : null;
+                const topVal = topMatch ? parseInt(topMatch[1], 10) : null;
+                return leftVal === t.left && topVal === t.top;
+            }});
             if (!el) return;
             el.style.setProperty('outline', '2px solid red', 'important');
             el.style.setProperty('outline-offset', '-2px', 'important');
@@ -610,8 +633,9 @@ def click_tile(tiles, tile_number):
     print(f"\n🖱️  Clicking tile #{tile_number} at screen ({screen_x}, {screen_y}) / dom ({dom_x}, {dom_y})...")
     draw_tile_borders(tiles)
     
-    dom_index = target_tile.get('index', tile_number)
-    dom_click_ok = click_tile_by_dom_index(dom_index)
+    dom_left = target_tile.get('left', target_tile.get('dom_x', 0))
+    dom_top = target_tile.get('top', target_tile.get('dom_y', 0))
+    dom_click_ok = click_tile_by_dom_position(dom_left, dom_top)
     if dom_click_ok:
         return True
 
