@@ -279,6 +279,75 @@ def click_at_position(screen_x, screen_y, dom_x=None, dom_y=None):
         return False
 
 
+def _unwrap_execute_result(data):
+    """Normalize /execute response payload to a plain dict if possible."""
+    if not isinstance(data, dict):
+        return None
+    result = data.get('result', data)
+    if isinstance(result, dict) and 'result' in result:
+        result = result.get('result')
+    if isinstance(result, dict) and result.get('type') == 'object' and 'value' in result:
+        return result.get('value')
+    if isinstance(result, dict):
+        return result
+    return None
+
+
+def click_tile_by_dom_index(tile_index, api_url=API_URL):
+    """Click a tile by its DOM listitem index using JS events."""
+    js_code = f"""
+(() => {{
+    const tiles = document.querySelectorAll('[role="listitem"]');
+    if (!tiles || tiles.length < {tile_index}) {{
+        return {{ success: false, error: 'Tile not found', requested: {tile_index}, total: tiles ? tiles.length : 0 }};
+    }}
+    const tile = tiles[{tile_index - 1}];
+    const rect = tile.getBoundingClientRect();
+    tile.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+
+    let clickTarget = tile.querySelector('a') || tile.querySelector('button') || tile;
+
+    const mousedownEvent = new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window }});
+    const mouseupEvent = new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window }});
+    const clickEvent = new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window }});
+
+    clickTarget.dispatchEvent(mousedownEvent);
+    clickTarget.dispatchEvent(mouseupEvent);
+    clickTarget.dispatchEvent(clickEvent);
+    clickTarget.click();
+
+    return {{
+        success: true,
+        index: {tile_index},
+        total: tiles.length,
+        clickTarget: clickTarget.tagName,
+        hasHref: !!clickTarget.href,
+        rect: {{ x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) }}
+    }};
+}})()
+"""
+
+    try:
+        response = requests.post(
+            f"{api_url}/execute",
+            json={"code": js_code},
+            timeout=10
+        )
+        if response.status_code == 200:
+            data = response.json()
+            result = _unwrap_execute_result(data)
+            if isinstance(result, dict) and result.get('success'):
+                print(f"   ✅ DOM click dispatched: target={result.get('clickTarget')} href={result.get('hasHref')}")
+                return True
+            if isinstance(result, dict):
+                print(f"   ⚠️ DOM click failed: {result}")
+            else:
+                print("   ⚠️ DOM click failed: unexpected response")
+    except Exception as e:
+        print(f"   ⚠️ DOM click error: {e}")
+    return False
+
+
 def get_dom_offset():
     """Compute DOM-to-viewport offset using the first listitem."""
     global _dom_offset
@@ -320,8 +389,7 @@ def get_dom_offset():
 
 
 def draw_tile_borders(tiles, max_tiles=None):
-    """Draw red borders around detected tiles in the page using DOM coordinates."""
-    offset_x, offset_y = get_dom_offset()
+    """Draw red borders around detected tiles using live DOM listitem bounds."""
     draw_tiles = [t for t in tiles if isinstance(t.get('index'), int)]
     if max_tiles is not None:
         draw_tiles = draw_tiles[:max_tiles]
@@ -330,10 +398,10 @@ def draw_tile_borders(tiles, max_tiles=None):
         {
             "index": t["index"],
             "label": t.get("global_position", t["index"]),
-            "x": t.get("dom_x", t.get("left", 0)) + offset_x,
-            "y": t.get("dom_y", t.get("top", 0)) + offset_y,
-            "w": t.get("dom_w", t.get("width", 0)),
-            "h": t.get("dom_h", t.get("height", 0)),
+            "x": t.get("screen_x", 0),
+            "y": t.get("screen_y", 0),
+            "w": t.get("screen_w", 0),
+            "h": t.get("screen_h", 0),
         }
         for t in draw_tiles
     ]
@@ -346,46 +414,37 @@ def draw_tile_borders(tiles, max_tiles=None):
         overlay_js = f"""
 (() => {{
     const tiles = {json.dumps(payload)};
-    let overlay = document.getElementById('__tile_bounds__');
-    if (overlay) overlay.remove();
+    const items = Array.from(document.querySelectorAll('[role="listitem"]'));
 
-    overlay = document.createElement('div');
-    overlay.id = '__tile_bounds__';
-    overlay.style.position = 'fixed';
-    overlay.style.left = '0';
-    overlay.style.top = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.zIndex = '999999';
-    overlay.style.pointerEvents = 'none';
-    document.body.appendChild(overlay);
+    const applyOutline = () => {{
+        let drawn = 0;
+        tiles.forEach(t => {{
+            const el = items[t.index - 1];
+            if (!el) return;
+            el.style.setProperty('outline', '2px solid red', 'important');
+            el.style.setProperty('outline-offset', '-2px', 'important');
+            if (el.dataset) el.dataset.__tileOutlined = '1';
 
-    tiles.forEach(t => {{
-        const box = document.createElement('div');
-        box.style.position = 'fixed';
-        box.style.left = t.x + 'px';
-        box.style.top = t.y + 'px';
-        box.style.width = t.w + 'px';
-        box.style.height = t.h + 'px';
-        box.style.border = '2px solid red';
-        box.style.boxSizing = 'border-box';
-        box.style.pointerEvents = 'none';
+            const img = el.querySelector('img');
+            if (img) {{
+                img.style.setProperty('outline', '2px solid red', 'important');
+                img.style.setProperty('outline-offset', '-2px', 'important');
+            }}
+            drawn += 1;
+        }});
+        return drawn;
+    }};
 
-        const label = document.createElement('div');
-        label.textContent = String(t.label);
-        label.style.position = 'absolute';
-        label.style.left = '0';
-        label.style.top = '0';
-        label.style.background = 'red';
-        label.style.color = 'white';
-        label.style.fontSize = '12px';
-        label.style.padding = '1px 3px';
-        box.appendChild(label);
+    const start = Date.now();
+    let drawn = 0;
+    const interval = setInterval(() => {{
+        drawn = applyOutline();
+        if (Date.now() - start > 3000) {{
+            clearInterval(interval);
+        }}
+    }}, 100);
 
-        overlay.appendChild(box);
-    }});
-
-    return {{ drawn: tiles.length }};
+    return {{ drawn, items: items.length }};
 }})()
 """
 
@@ -393,7 +452,10 @@ def draw_tile_borders(tiles, max_tiles=None):
         if resp.status_code == 200:
             data = resp.json()
             if data.get('status') in ['success', 'ok']:
-                print(f"   🟥 Drew borders for {len(payload)} tiles")
+                result = _unwrap_execute_result(data) or {}
+                drawn = result.get('drawn', 0)
+                items = result.get('items', 0)
+                print(f"   🟥 Drew borders for {drawn} tiles (DOM items: {items})")
                 return True
     except Exception as e:
         print(f"   ⚠️ Failed to draw tile borders: {e}")
@@ -548,6 +610,11 @@ def click_tile(tiles, tile_number):
     print(f"\n🖱️  Clicking tile #{tile_number} at screen ({screen_x}, {screen_y}) / dom ({dom_x}, {dom_y})...")
     draw_tile_borders(tiles)
     
+    dom_index = target_tile.get('index', tile_number)
+    dom_click_ok = click_tile_by_dom_index(dom_index)
+    if dom_click_ok:
+        return True
+
     success = click_at_position(screen_x, screen_y, dom_x=dom_x, dom_y=dom_y)
     
     if success:
@@ -634,10 +701,30 @@ def stop_browser():
     global _browser_controller
     
     if _browser_controller is not None:
+        release_stuck_modifiers()
         print("\n🛑 Closing browser...")
         _browser_controller.stop()
         _browser_controller = None
         print("✓ Browser closed")
+
+
+def release_stuck_modifiers(api_url=API_URL):
+    """Release modifier keys that may remain pressed in the container browser."""
+    try:
+        js_code = """
+(() => {
+    const keys = ['Alt', 'Control', 'Meta', 'Shift'];
+    keys.forEach(k => {
+        const ev = new KeyboardEvent('keyup', { key: k, code: k, bubbles: true, cancelable: true });
+        window.dispatchEvent(ev);
+        document.dispatchEvent(ev);
+    });
+    return { released: keys };
+})()
+"""
+        requests.post(f"{api_url}/execute", json={"code": js_code}, timeout=5)
+    except Exception as e:
+        print(f"   ⚠️ Failed to release modifier keys: {e}")
 
 
 def interactive_mode():
@@ -879,6 +966,7 @@ Interactive mode:
             generate_html_report(tiles, args.output, clicked_tile)
         
         print("\n✅ Test completed successfully!")
+        release_stuck_modifiers()
         input("\nPress Enter to quit...")
         stop_browser()
         return 0
