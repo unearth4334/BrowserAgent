@@ -506,6 +506,158 @@ def draw_tile_borders(tiles, max_tiles=None):
     return False
 
 
+def analyze_media_pane_source():
+    """Fetch page source and print hints about video/image controls."""
+    html = get_page_source() or ""
+    if not html:
+        print("   ⚠️ No HTML returned from page source")
+        return
+
+    hints = []
+    for needle in [
+        'aria-label="Video"',
+        'aria-label="Image"',
+        'aria-label="Play"',
+        'video',
+        'Video',
+        'Image'
+    ]:
+        if needle in html:
+            hints.append(needle)
+
+    if hints:
+        print(f"   ℹ️ Page source hints: {', '.join(hints)}")
+    else:
+        print("   ⚠️ No obvious video/image hints found in page source")
+
+
+def draw_media_action_targets():
+    """Draw circles over Video/Image buttons in the opened media pane."""
+    analyze_media_pane_source()
+
+    js_code = """
+(() => {
+    const candidates = [];
+
+    const byAria = (label) => Array.from(document.querySelectorAll('[role="button"],button'))
+        .filter(el => (el.getAttribute('aria-label') || '').toLowerCase().includes(label));
+
+    const byText = (label) => Array.from(document.querySelectorAll('[role="button"],button'))
+        .filter(el => (el.textContent || '').trim().toLowerCase() === label);
+
+    candidates.push(...byAria('video'));
+    candidates.push(...byAria('image'));
+    candidates.push(...byText('video'));
+    candidates.push(...byText('image'));
+
+    const unique = Array.from(new Set(candidates));
+    const diagnostics = [];
+
+    unique.forEach((el, idx) => {
+        const rect = el.getBoundingClientRect();
+        const cx = Math.round(rect.left + rect.width / 2);
+        const cy = Math.round(rect.top + rect.height / 2);
+
+        const marker = document.createElement('div');
+        marker.style.position = 'fixed';
+        marker.style.width = '16px';
+        marker.style.height = '16px';
+        marker.style.border = '2px solid red';
+        marker.style.borderRadius = '50%';
+        marker.style.zIndex = '999999';
+        marker.style.pointerEvents = 'none';
+        marker.style.left = (cx - 8) + 'px';
+        marker.style.top = (cy - 8) + 'px';
+        marker.title = el.getAttribute('aria-label') || el.textContent || 'button';
+        document.body.appendChild(marker);
+
+        diagnostics.push({
+            index: idx + 1,
+            tag: el.tagName,
+            role: el.getAttribute('role') || null,
+            ariaLabel: el.getAttribute('aria-label') || null,
+            text: (el.textContent || '').trim().slice(0, 80),
+            x: rect.left,
+            y: rect.top,
+            w: rect.width,
+            h: rect.height
+        });
+    });
+
+    return { count: unique.length, diagnostics };
+})()
+"""
+
+    try:
+        resp = requests.post(f"{API_URL}/execute", json={"code": js_code}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            result = _unwrap_execute_result(data) or {}
+            count = result.get('count', 0)
+            print(f"   🟥 Drew {count} media action target(s)")
+            for item in result.get('diagnostics', []) or []:
+                print(
+                    "   • #{index} tag={tag} role={role} aria={ariaLabel} text='{text}' "
+                    "rect=({x:.0f},{y:.0f},{w:.0f},{h:.0f})".format(**item)
+                )
+            return True
+    except Exception as e:
+        print(f"   ⚠️ Failed to draw media action targets: {e}")
+    return False
+
+
+def click_media_button(label):
+    """Click the media pane button with text 'Video' or 'Image'."""
+    js_code = """
+(() => {{
+    const target = "{label}".toLowerCase();
+    const buttons = Array.from(document.querySelectorAll('button,[role="button"]'));
+    const match = buttons.find(el => (el.textContent || '').trim().toLowerCase() === target);
+    if (!match) {{
+        return {{ success: false, error: 'Button not found', target }};
+    }}
+    const rect = match.getBoundingClientRect();
+    const cx = Math.round(rect.left + rect.width / 2);
+    const cy = Math.round(rect.top + rect.height / 2);
+    const hit = document.elementFromPoint(cx, cy) || match;
+    const clickTarget = hit.closest('button,[role="button"]') || hit;
+
+    const mousedownEvent = new MouseEvent('mousedown', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }});
+    const mouseupEvent = new MouseEvent('mouseup', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }});
+    const clickEvent = new MouseEvent('click', {{ bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy }});
+
+    clickTarget.dispatchEvent(mousedownEvent);
+    clickTarget.dispatchEvent(mouseupEvent);
+    clickTarget.dispatchEvent(clickEvent);
+    clickTarget.click();
+
+    return {{ success: true, target, rect: {{ x: rect.left, y: rect.top, w: rect.width, h: rect.height }} }};
+}})()
+""".format(label=label)
+
+    try:
+        resp = requests.post(f"{API_URL}/execute", json={"code": js_code}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            result = _unwrap_execute_result(data) or {}
+            if result.get('success'):
+                rect = result.get('rect', {})
+                print(
+                    "   ✅ Clicked {target} button at ({x:.0f},{y:.0f},{w:.0f},{h:.0f})".format(
+                        target=label,
+                        x=rect.get('x', 0),
+                        y=rect.get('y', 0),
+                        w=rect.get('w', 0),
+                        h=rect.get('h', 0),
+                    )
+                )
+                return True
+            print(f"   ⚠️ {result.get('error', 'Click failed')}")
+    except Exception as e:
+        print(f"   ⚠️ Failed to click {label} button: {e}")
+    return False
+
+
 def catalog_tiles(num_tiles, clear_db=False):
     """
     Catalog the specified number of tiles.
@@ -718,7 +870,10 @@ def show_menu():
     print("4. Clear database")
     print("5. Generate HTML report")
     print("6. View tile count")
-    print("7. Exit")
+    print("7. Draw media action targets")
+    print("8. Click Video button")
+    print("9. Click Image button")
+    print("10. Exit")
     print("=" * 60)
 
 
@@ -829,7 +984,7 @@ def interactive_mode():
     while True:
         show_menu()
         
-        choice = input("\nEnter your choice (1-7): ").strip()
+        choice = input("\nEnter your choice (1-10): ").strip()
         
         if choice == '1':
             # Catalog tiles
@@ -934,13 +1089,25 @@ def interactive_mode():
                 pass
         
         elif choice == '7':
+            # Draw media action targets
+            draw_media_action_targets()
+
+        elif choice == '8':
+            # Click Video button
+            click_media_button('Video')
+
+        elif choice == '9':
+            # Click Image button
+            click_media_button('Image')
+
+        elif choice == '10':
             # Exit
             print("\n👋 Goodbye!")
             stop_browser()
             return 0
         
         else:
-            print("\n⚠️  Invalid choice. Please enter a number between 1 and 7.")
+            print("\n⚠️  Invalid choice. Please enter a number between 1 and 10.")
 
 
 def main():
