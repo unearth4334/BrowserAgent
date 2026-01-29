@@ -295,7 +295,7 @@ def _unwrap_execute_result(data):
 
 def click_tile_by_dom_position(left, top, api_url=API_URL):
     """Click a tile by matching its DOM style left/top using JS events."""
-    js_code = f"""
+    js_code = """
 (() => {{
     const targetLeft = {left};
     const targetTop = {top};
@@ -322,6 +322,22 @@ def click_tile_by_dom_position(left, top, api_url=API_URL):
 
     const centerX = Math.round(rect.left + rect.width / 2);
     const centerY = Math.round(rect.top + rect.height / 2);
+    let marker = document.getElementById('__click_point__');
+    if (!marker) {{
+        marker = document.createElement('div');
+        marker.id = '__click_point__';
+        marker.style.position = 'fixed';
+        marker.style.width = '16px';
+        marker.style.height = '16px';
+        marker.style.border = '2px solid red';
+        marker.style.borderRadius = '50%';
+        marker.style.zIndex = '999999';
+        marker.style.pointerEvents = 'none';
+        document.body.appendChild(marker);
+    }}
+    marker.style.left = (centerX - 8) + 'px';
+    marker.style.top = (centerY - 8) + 'px';
+
     const hit = document.elementFromPoint(centerX, centerY) || match;
     let clickTarget = hit.closest('a,button') || hit;
 
@@ -344,7 +360,7 @@ def click_tile_by_dom_position(left, top, api_url=API_URL):
         hitTag: hit.tagName
     }};
 }})()
-"""
+""".format(left=int(left), top=int(top))
 
     try:
         response = requests.post(
@@ -626,6 +642,42 @@ def click_tile(tiles, tile_number):
         print(f"\n❌ Tile #{tile_number} not found")
         return False
     
+    # If target is outside viewport, scroll it into view and refresh coordinates
+    screen_y_top = target_tile.get('screen_y', target_tile.get('top', 0))
+    screen_h = target_tile.get('screen_h', target_tile.get('height', 0))
+    if screen_y_top < 0 or (screen_y_top + screen_h) > VIEWPORT_HEIGHT:
+        desired_center = VIEWPORT_HEIGHT // 2
+        current_center = screen_y_top + (screen_h // 2)
+        delta_y = int(current_center - desired_center)
+        if delta_y != 0:
+            print(f"   📜 Scrolling to bring tile into view (deltaY={delta_y})...")
+            scroll_down(delta_y)
+            time.sleep(1.5)
+
+            # Refresh tiles after scroll and remap target by thumbnail URL
+            rectangles, tiles_fresh = detect_tiles_from_html(
+                api_url=API_URL,
+                scale_factor=(0.75, 0.75),
+                tile_height=680
+            )
+            thumb = target_tile.get('thumbnail_url')
+            updated = None
+            for rect, tile in zip(rectangles, tiles_fresh):
+                if thumb and tile.get('thumbnail_url') == thumb:
+                    x, y, w, h = rect
+                    tile['screen_x'] = x
+                    tile['screen_y'] = y
+                    tile['screen_w'] = w
+                    tile['screen_h'] = h
+                    tile['dom_x'] = tile.get('left', 0)
+                    tile['dom_y'] = tile.get('top', 0)
+                    tile['dom_w'] = tile.get('width', 0)
+                    tile['dom_h'] = 680
+                    updated = tile
+                    break
+            if updated:
+                target_tile = updated
+
     # Calculate click coordinates (center of tile)
     screen_x = target_tile.get('screen_x', target_tile.get('left', 0)) + (target_tile.get('screen_w', target_tile.get('width', 0)) // 2)
     screen_y = target_tile.get('screen_y', target_tile.get('top', 0)) + (target_tile.get('screen_h', target_tile.get('height', 0)) // 2)
@@ -637,6 +689,7 @@ def click_tile(tiles, tile_number):
     
     print(f"\n🖱️  Clicking tile #{tile_number} at screen ({screen_x}, {screen_y}) / dom ({dom_x}, {dom_y})...")
     draw_tile_borders(tiles)
+    time.sleep(1.0)
     
     dom_left = target_tile.get('left', target_tile.get('dom_x', 0))
     dom_top = target_tile.get('top', target_tile.get('dom_y', 0))
