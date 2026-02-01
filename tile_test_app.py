@@ -517,7 +517,10 @@ def analyze_media_pane_source():
     for needle in [
         'aria-label="Video"',
         'aria-label="Image"',
+        'aria-label="Download"',
         'aria-label="Play"',
+        'download',
+        'Download',
         'video',
         'Video',
         'Image'
@@ -529,6 +532,113 @@ def analyze_media_pane_source():
         print(f"   ℹ️ Page source hints: {', '.join(hints)}")
     else:
         print("   ⚠️ No obvious video/image hints found in page source")
+
+
+def _print_source_snippet(html, needle, context=80):
+    """Print a small snippet around the first occurrence of a needle."""
+    idx = html.lower().find(needle.lower())
+    if idx == -1:
+        return False
+    start = max(0, idx - context)
+    end = min(len(html), idx + context)
+    snippet = html[start:end].replace("\n", " ")
+    print(f"   🔎 Found '{needle}': ...{snippet}...")
+    return True
+
+
+def draw_download_target():
+    """Review page source and draw a circle over the download button."""
+    html = get_page_source() or ""
+    if html:
+        printed = False
+        for needle in ["download", "Download", "aria-label=\"Download\"", "data-testid", "icon-download"]:
+            printed = _print_source_snippet(html, needle) or printed
+        if not printed:
+            print("   ⚠️ No download-related snippet found in page source")
+
+    js_code = """
+(() => {
+    const selectors = [
+        '[aria-label*="download" i]',
+        '[title*="download" i]',
+        '[data-testid*="download" i]',
+        'button[aria-label*="download" i]',
+        'button[title*="download" i]'
+    ];
+
+    let el = null;
+    for (const sel of selectors) {
+        el = document.querySelector(sel);
+        if (el) break;
+    }
+
+    if (!el) {
+        // Fallback: try buttons with svg/use referencing download icons
+        const candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+        el = candidates.find(btn => {
+            const use = btn.querySelector('use');
+            const href = use ? (use.getAttribute('href') || use.getAttribute('xlink:href') || '') : '';
+            return /download/i.test(href);
+        }) || null;
+    }
+
+    if (!el) {
+        return { success: false, error: 'Download button not found' };
+    }
+
+    const rect = el.getBoundingClientRect();
+    const cx = Math.round(rect.left + rect.width / 2);
+    const cy = Math.round(rect.top + rect.height / 2);
+
+    let marker = document.getElementById('__download_point__');
+    if (!marker) {
+        marker = document.createElement('div');
+        marker.id = '__download_point__';
+        marker.style.position = 'fixed';
+        marker.style.width = '16px';
+        marker.style.height = '16px';
+        marker.style.border = '2px solid red';
+        marker.style.borderRadius = '50%';
+        marker.style.zIndex = '999999';
+        marker.style.pointerEvents = 'none';
+        document.body.appendChild(marker);
+    }
+    marker.style.left = (cx - 8) + 'px';
+    marker.style.top = (cy - 8) + 'px';
+
+    return {
+        success: true,
+        tag: el.tagName,
+        ariaLabel: el.getAttribute('aria-label') || null,
+        title: el.getAttribute('title') || null,
+        rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height }
+    };
+})()
+"""
+
+    try:
+        resp = requests.post(f"{API_URL}/execute", json={"code": js_code}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            result = _unwrap_execute_result(data) or {}
+            if result.get('success'):
+                rect = result.get('rect', {})
+                print(
+                    "   🟥 Download target at ({x:.0f},{y:.0f},{w:.0f},{h:.0f}) tag={tag} aria={ariaLabel} title={title}".format(
+                        x=rect.get('x', 0),
+                        y=rect.get('y', 0),
+                        w=rect.get('w', 0),
+                        h=rect.get('h', 0),
+                        tag=result.get('tag'),
+                        ariaLabel=result.get('ariaLabel'),
+                        title=result.get('title'),
+                    )
+                )
+                return True
+            print(f"   ⚠️ {result.get('error', 'Download target not found')}")
+    except Exception as e:
+        print(f"   ⚠️ Failed to draw download target: {e}")
+    return False
 
 
 def draw_media_action_targets():
@@ -547,8 +657,10 @@ def draw_media_action_targets():
 
     candidates.push(...byAria('video'));
     candidates.push(...byAria('image'));
+    candidates.push(...byAria('download'));
     candidates.push(...byText('video'));
     candidates.push(...byText('image'));
+    candidates.push(...byText('download'));
 
     const unique = Array.from(new Set(candidates));
     const diagnostics = [];
@@ -607,12 +719,14 @@ def draw_media_action_targets():
 
 
 def click_media_button(label):
-    """Click the media pane button with text 'Video' or 'Image'."""
+    """Click the media pane button with exact text label (Video/Image/Download)."""
     js_code = """
 (() => {{
     const target = "{label}".toLowerCase();
     const buttons = Array.from(document.querySelectorAll('button,[role="button"]'));
-    const match = buttons.find(el => (el.textContent || '').trim().toLowerCase() === target);
+    const matchByText = buttons.find(el => (el.textContent || '').trim().toLowerCase() === target);
+    const matchByAria = buttons.find(el => (el.getAttribute('aria-label') || '').trim().toLowerCase() === target);
+    const match = matchByText || matchByAria;
     if (!match) {{
         return {{ success: false, error: 'Button not found', target }};
     }}
@@ -656,6 +770,304 @@ def click_media_button(label):
     except Exception as e:
         print(f"   ⚠️ Failed to click {label} button: {e}")
     return False
+
+
+def send_macro(name, api_url=API_URL):
+    """Send a predefined keyboard macro to the container (e.g., save, enter, close_tab, back)."""
+    try:
+        resp = requests.post(f"{api_url}/macro/{name}", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') in ['ok', 'success']:
+                return True
+        print(f"   ⚠️ Macro '{name}' failed: {resp.text[:120]}")
+    except Exception as e:
+        print(f"   ⚠️ Macro '{name}' error: {e}")
+    return False
+
+
+def send_keys(keys, api_url=API_URL):
+    """Send a raw key sequence to the container (e.g., 'ctrl+s')."""
+    try:
+        resp = requests.post(f"{api_url}/keys", json={"keys": keys}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('status') in ['ok', 'success']:
+                return True
+        print(f"   ⚠️ Keys '{keys}' failed: {resp.text[:120]}")
+    except Exception as e:
+        print(f"   ⚠️ Keys '{keys}' error: {e}")
+    return False
+
+
+def send_shortcut(macro_name, fallback_keys):
+    """Send a shortcut via macro, fallback to raw keys."""
+    print(f"   ➜ Sending shortcut: {macro_name} (fallback: {fallback_keys})")
+    if send_macro(macro_name):
+        return True
+    return send_keys(fallback_keys)
+
+
+def click_back_button():
+    """Click the UI Back button with aria-label='Back' if present."""
+    print("   ➜ Attempting to click Back button (aria-label=Back)")
+    js_code = """
+(() => {
+    const el = document.querySelector('[aria-label="Back"]');
+    if (!el) return { success: false, error: 'Back button not found' };
+    const rect = el.getBoundingClientRect();
+    const cx = Math.round(rect.left + rect.width / 2);
+    const cy = Math.round(rect.top + rect.height / 2);
+    let marker = document.getElementById('__back_button_marker__');
+    if (!marker) {
+        marker = document.createElement('div');
+        marker.id = '__back_button_marker__';
+        marker.style.position = 'fixed';
+        marker.style.width = '18px';
+        marker.style.height = '18px';
+        marker.style.border = '2px solid red';
+        marker.style.borderRadius = '50%';
+        marker.style.zIndex = '999999';
+        marker.style.pointerEvents = 'none';
+        document.body.appendChild(marker);
+    }
+    marker.style.left = (cx - 9) + 'px';
+    marker.style.top = (cy - 9) + 'px';
+    const mousedownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy });
+    const mouseupEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy });
+    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy });
+    el.dispatchEvent(mousedownEvent);
+    el.dispatchEvent(mouseupEvent);
+    el.dispatchEvent(clickEvent);
+    el.click();
+    return { success: true, rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height } };
+})()
+"""
+    try:
+        resp = requests.post(f"{API_URL}/execute", json={"code": js_code}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            result = _unwrap_execute_result(data) or {}
+            if result.get('success'):
+                rect = result.get('rect', {}) or {}
+                print(
+                    "   ✅ Back button clicked at ({x:.0f},{y:.0f},{w:.0f},{h:.0f})".format(
+                        x=rect.get('x', 0),
+                        y=rect.get('y', 0),
+                        w=rect.get('w', 0),
+                        h=rect.get('h', 0),
+                    )
+                )
+                return True
+            print(f"   ⚠️ {result.get('error', 'Back button click failed')}")
+    except Exception as e:
+        print(f"   ⚠️ Back button click error: {e}")
+    return False
+
+
+def click_favourites_button():
+    """Click the UI Favourites button (aria-label) if present, with a red marker."""
+    print("   ➜ Attempting to click Favourites button (aria-label=Favourites)")
+    js_code = """
+(() => {
+    const el = document.querySelector('[aria-label="Favourites"], [aria-label="Favorites"]');
+    if (!el) return { success: false, error: 'Favourites button not found' };
+    const rect = el.getBoundingClientRect();
+    const cx = Math.round(rect.left + rect.width / 2);
+    const cy = Math.round(rect.top + rect.height / 2);
+    let marker = document.getElementById('__favourites_button_marker__');
+    if (!marker) {
+        marker = document.createElement('div');
+        marker.id = '__favourites_button_marker__';
+        marker.style.position = 'fixed';
+        marker.style.width = '18px';
+        marker.style.height = '18px';
+        marker.style.border = '2px solid red';
+        marker.style.borderRadius = '50%';
+        marker.style.zIndex = '999999';
+        marker.style.pointerEvents = 'none';
+        document.body.appendChild(marker);
+    }
+    marker.style.left = (cx - 9) + 'px';
+    marker.style.top = (cy - 9) + 'px';
+    const mousedownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy });
+    const mouseupEvent = new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy });
+    const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: cx, clientY: cy });
+    el.dispatchEvent(mousedownEvent);
+    el.dispatchEvent(mouseupEvent);
+    el.dispatchEvent(clickEvent);
+    el.click();
+    return { success: true, rect: { x: rect.left, y: rect.top, w: rect.width, h: rect.height } };
+})()
+"""
+    try:
+        resp = requests.post(f"{API_URL}/execute", json={"code": js_code}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            result = _unwrap_execute_result(data) or {}
+            if result.get('success'):
+                rect = result.get('rect', {}) or {}
+                print(
+                    "   ✅ Favourites button clicked at ({x:.0f},{y:.0f},{w:.0f},{h:.0f})".format(
+                        x=rect.get('x', 0),
+                        y=rect.get('y', 0),
+                        w=rect.get('w', 0),
+                        h=rect.get('h', 0),
+                    )
+                )
+                return True
+            print(f"   ⚠️ {result.get('error', 'Favourites button click failed')}")
+    except Exception as e:
+        print(f"   ⚠️ Favourites button click error: {e}")
+    return False
+
+
+def close_tab_via_cdp():
+    """Attempt to close the current tab via CDP-backed JS execution."""
+    print("   ➜ Closing tab via CDP (/cdp/close-tab)")
+    try:
+        payload = {
+            "prefer_contains": [],
+            "prefer_not_contains": ["grok.com/imagine/favorites"],
+            "image_hints": ["assets.grok.com", "blob:", "data:", ".png", ".jpg", ".jpeg", ".webp"],
+        }
+        resp = requests.post(f"{API_URL}/cdp/close-tab", json=payload, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("status") in ["ok", "success"]:
+                closed = data.get("closed", {})
+                print(f"   ✅ Closed tab via CDP: {closed.get('url')}")
+                return True
+        if resp.status_code == 404:
+            print("   ⚠️ CDP close endpoint not found. Rebuild/restart the API container to enable it.")
+        else:
+            print(f"   ⚠️ CDP close failed: {resp.status_code} {resp.text[:120]}")
+    except Exception as e:
+        print(f"   ⚠️ CDP tab close error: {e}")
+    print("   ➜ Falling back to macro close_tab")
+    return send_macro("close_tab")
+
+
+def get_cdp_tabs():
+    """Fetch current Chrome tabs via the API container."""
+    try:
+        resp = requests.get(f"{API_URL}/cdp/tabs", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("status") in ["ok", "success"]:
+                return data.get("tabs", []) or []
+        print(f"   ⚠️ Failed to list CDP tabs: {resp.status_code} {resp.text[:120]}")
+    except Exception as e:
+        print(f"   ⚠️ CDP tabs error: {e}")
+    return []
+
+
+def close_tab_by_id(tab_id):
+    """Close a specific Chrome tab id via the API container."""
+    if not tab_id:
+        return False
+    try:
+        resp = requests.post(f"{API_URL}/cdp/close-tab", json={"tab_id": tab_id}, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("status") in ["ok", "success"]:
+                return True
+        print(f"   ⚠️ Failed to close tab id {tab_id}: {resp.status_code} {resp.text[:120]}")
+    except Exception as e:
+        print(f"   ⚠️ CDP close id error: {e}")
+    return False
+
+
+def run_download_key_sequence(close_tab_ids=None):
+    """Send Ctrl+S, Enter, Ctrl+W, Alt+Left via container keyboard API."""
+    print("\n🔧 Image download: sending Ctrl+S")
+    time.sleep(1.0)
+    send_shortcut('save', 'ctrl+s')
+    time.sleep(1.0)
+    print("\n🔧 Image download: sending Enter")
+    time.sleep(0.8)
+    send_shortcut('enter', 'Return')
+    time.sleep(1.0)
+    print("\n🔧 Image download: closing image tab via CDP")
+    time.sleep(1.0)
+    if close_tab_ids:
+        closed_any = False
+        for tab_id in close_tab_ids:
+            print(f"   ➜ Closing tab id: {tab_id}")
+            closed_any = close_tab_by_id(tab_id) or closed_any
+        if not closed_any:
+            print("   ⚠️ CDP close failed. Image tab may still be open.")
+    else:
+        if not close_tab_via_cdp():
+            print("   ⚠️ CDP close failed. Image tab may still be open.")
+    if close_tab_ids:
+        print("   ➜ Waiting for image tab(s) to close...")
+        for _ in range(12):
+            time.sleep(0.5)
+            tabs_now = get_cdp_tabs()
+            live_ids = {t.get("id") for t in tabs_now if t.get("id")}
+            remaining = [tid for tid in close_tab_ids if tid in live_ids]
+            if not remaining:
+                print("   ✅ Image tab(s) closed")
+                break
+        else:
+            print(f"   ⚠️ Still open tab id(s): {', '.join(remaining)}")
+    time.sleep(1.0)
+    time.sleep(0.4)
+    print("\n🔧 Image download: returning via Back button")
+    if not click_back_button():
+        print("   ⚠️ Back button not found. Tileview may require manual navigation.")
+    time.sleep(1.0)
+    if click_favourites_button():
+        time.sleep(1.0)
+    return True
+
+
+def run_catalog_click_download_flow():
+    """Catalog up to a tile index, click it, then handle video/image download flow."""
+    tile_num = get_int_input("\n📊 Catalog up to which tile index? ", min_val=1)
+    if tile_num is None:
+        return False
+
+    clear = input("Clear database first? (y/n): ").strip().lower() == 'y'
+    tiles = catalog_tiles(tile_num, clear_db=clear)
+    if not tiles or len(tiles) < tile_num:
+        print("\n❌ Failed to catalog enough tiles")
+        return False
+
+    if not click_tile(tiles, tile_num):
+        print(f"\n❌ Failed to click tile #{tile_num}")
+        return False
+
+    time.sleep(3)
+    target_tile = next((t for t in tiles if t.get('global_position') == tile_num), None)
+    has_video = bool(target_tile and target_tile.get('has_video', False))
+
+    if has_video:
+        print("\n🎞️  Video detected - starting video download sequence")
+        click_media_button('Video')
+        time.sleep(1.0)
+        click_media_button('Download')
+        time.sleep(1.2)
+    else:
+        print("\n🖼️  No video detected - skipping video download sequence")
+    print("\n🖼️  Switching to Image tab...")
+    click_media_button('Image')
+    time.sleep(1.0)
+
+    print("\n⬇️  Clicking image Download button...")
+    tabs_before = get_cdp_tabs()
+    before_ids = {t.get("id") for t in tabs_before if t.get("id")}
+    click_media_button('Download')
+    time.sleep(1.0)
+    tabs_after = get_cdp_tabs()
+    after_ids = {t.get("id") for t in tabs_after if t.get("id")}
+    new_ids = [tid for tid in after_ids if tid not in before_ids]
+    if new_ids:
+        print(f"   ➜ New tab ids detected: {', '.join(new_ids)}")
+    else:
+        print("   ⚠️ No new tab ids detected")
+    run_download_key_sequence(close_tab_ids=new_ids)
 
 
 def catalog_tiles(num_tiles, clear_db=False):
@@ -873,7 +1285,10 @@ def show_menu():
     print("7. Draw media action targets")
     print("8. Click Video button")
     print("9. Click Image button")
-    print("10. Exit")
+    print("10. Click Download button")
+    print("11. Draw Download target")
+    print("12. Catalog + click + download workflow")
+    print("13. Exit")
     print("=" * 60)
 
 
@@ -984,7 +1399,7 @@ def interactive_mode():
     while True:
         show_menu()
         
-        choice = input("\nEnter your choice (1-10): ").strip()
+        choice = input("\nEnter your choice (1-13): ").strip()
         
         if choice == '1':
             # Catalog tiles
@@ -1101,13 +1516,25 @@ def interactive_mode():
             click_media_button('Image')
 
         elif choice == '10':
+            # Click Download button
+            click_media_button('Download')
+
+        elif choice == '11':
+            # Draw Download target
+            draw_download_target()
+
+        elif choice == '12':
+            # Catalog + click + download workflow
+            run_catalog_click_download_flow()
+
+        elif choice == '13':
             # Exit
             print("\n👋 Goodbye!")
             stop_browser()
             return 0
         
         else:
-            print("\n⚠️  Invalid choice. Please enter a number between 1 and 10.")
+            print("\n⚠️  Invalid choice. Please enter a number between 1 and 13.")
 
 
 def main():
