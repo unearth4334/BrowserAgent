@@ -50,3 +50,4 @@ outputs/
 vastai_credentials.txt
 
 examples/forge/checkpoint_list.txt
+tile_hashes.db
